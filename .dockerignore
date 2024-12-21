@@ -1,0 +1,14 @@
+.git*
+
+*docker-compose*
+*Dockerfile*
+.dockerignore
+
+node_modules
+
+README.md
+
+dist
+mysql
+redis
+config

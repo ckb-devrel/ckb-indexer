@@ -1,0 +1,8 @@
+port: 8080
+
+mysql:
+  host: db
+  port: 3306
+  username: appdb
+  password: appdb
+  database: appdb

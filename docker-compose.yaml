@@ -1,0 +1,29 @@
+services:
+  be:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml
+    depends_on:
+      - db
+    networks:
+      - networks
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: appdb
+      MYSQL_DATABASE: appdb
+      MYSQL_USER: appdb
+      MYSQL_PASSWORD: appdb
+    command:
+      - '--skip-log-bin'
+    volumes:
+      - ./mysql:/var/lib/mysql
+    restart: always
+    networks:
+      - networks
+
+networks:
+  networks:
+    driver: bridge
