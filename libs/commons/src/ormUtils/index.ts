@@ -1,3 +1,4 @@
+import { ccc } from "@ckb-ccc/core";
 import {
   EntityManager,
   FindOptionsOrder,
@@ -63,29 +64,33 @@ export async function withTransaction<T>(
   return await defaultManager.transaction(handler);
 }
 
-export function formatSortableInt(str: string, digits = 80) {
+export function formatSortableInt(numLike: ccc.NumLike, digits = 80) {
+  const str = ccc.numFrom(numLike).toString();
+
   if (str.charAt(0) === "-") {
     return `-${str.substring(1).padStart(digits, "0")}`;
   }
   return str.padStart(digits, "0");
 }
 
-export function parseSortableInt(str: string) {
+export function parseSortableInt(str: string): ccc.Num {
   if (str.charAt(0) === "-") {
     const val = str.substring(1).replace(/^0*/, "");
     if (val === "") {
-      return "0";
+      return ccc.Zero;
     }
-    return `-${val}`;
+    return ccc.numFrom(`-${val}`);
   }
   const val = str.replace(/^0*/, "");
   if (val === "") {
-    return "0";
+    return ccc.Zero;
   }
-  return val;
+  return ccc.numFrom(val);
 }
 
-export function formatSortable(str: string, digits = 80) {
+export function formatSortable(numLike: ccc.NumLike, digits = 80) {
+  const str =
+    typeof numLike === "string" ? numLike : ccc.numFrom(numLike).toString();
   const [l, r] = str.split(".");
 
   const lRes = formatSortableInt(l, digits);
@@ -96,12 +101,12 @@ export function formatSortable(str: string, digits = 80) {
   return `${lRes}.${r}`;
 }
 
-export function parseSortable(str: string) {
+export function parseSortable(str: string): string {
   const [l, r] = str.split(".");
 
   const lRes = parseSortableInt(l);
   if (r === undefined) {
-    return lRes;
+    return lRes.toString();
   }
 
   return `${lRes}.${r}`;

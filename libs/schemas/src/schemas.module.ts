@@ -4,9 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   SyncStatus,
   UdtBalance,
-  UdtBalancePending,
   UdtInfo,
-  UdtInfoPending,
 } from "./schemas";
 
 @Module({
@@ -24,9 +22,7 @@ import {
         entities: [
           SyncStatus,
           UdtInfo,
-          UdtInfoPending,
           UdtBalance,
-          UdtBalancePending,
         ],
       }),
     }),

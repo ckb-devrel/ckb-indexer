@@ -1,4 +1,4 @@
-import { formatSortable, parseSortable } from "@app/commons";
+import { formatSortableInt, parseSortableInt } from "@app/commons";
 import { SyncStatus } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable } from "@nestjs/common";
@@ -16,13 +16,10 @@ export class SyncStatusRepo extends Repository<SyncStatus> {
       throw Error(`Sync status not found: ${key}`);
     }
 
-    return ccc.numFrom(parseSortable(found.value));
+    return parseSortableInt(found.value);
   }
 
   async updateSyncHeight(key: string, height: ccc.NumLike): Promise<void> {
-    await this.update(
-      { key },
-      { value: formatSortable(ccc.numFrom(height).toString()) },
-    );
+    await this.update({ key }, { value: formatSortableInt(height) });
   }
 }

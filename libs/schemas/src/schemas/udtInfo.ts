@@ -8,13 +8,18 @@ import {
 } from "typeorm";
 
 @Entity()
+@Index(["hash", "updatedAtHeight"], { unique: true })
 export class UdtInfo {
   @PrimaryGeneratedColumn("increment")
   id: number;
 
   @Column({ type: "varchar" })
-  @Index({ unique: true })
+  @Index()
   hash: string;
+
+  // To roll back on re-org
+  @Column({ type: "varchar" })
+  updatedAtHeight: string;
 
   /* === Token type script === */
   @Column({ type: "varchar" })
@@ -50,7 +55,7 @@ export class UdtInfo {
   totalSupply: string;
 
   @Column({ type: "varchar" })
-  circulatingSupply: string;
+  capacity: string;
   /* === Statistic fields === */
 
   @CreateDateColumn()
@@ -59,6 +64,3 @@ export class UdtInfo {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-@Entity()
-export class UdtInfoPending extends UdtInfo {}
