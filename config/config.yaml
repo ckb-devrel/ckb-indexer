@@ -6,3 +6,7 @@ mysql:
   username: appdb
   password: appdb
   database: appdb
+
+sync:
+  interval: 10000
+  blockLimitPerInterval: 20

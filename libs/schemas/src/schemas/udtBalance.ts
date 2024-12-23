@@ -8,7 +8,7 @@ import {
 } from "typeorm";
 
 @Entity()
-@Index(["addressHash", "tokenHash"], { unique: true })
+@Index(["addressHash", "tokenHash", "updatedAtHeight"], { unique: true })
 export class UdtBalance {
   @PrimaryGeneratedColumn("increment")
   id: number;
@@ -20,6 +20,10 @@ export class UdtBalance {
   @Column({ type: "varchar" })
   @Index()
   tokenHash: string;
+
+  // To roll back on re-org
+  @Column({ type: "varchar" })
+  updatedAtHeight: string;
 
   @Column({ type: "text" })
   address: string;
@@ -38,6 +42,3 @@ export class UdtBalance {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-@Entity()
-export class UdtBalancePending extends UdtBalance {}
