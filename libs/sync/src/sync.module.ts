@@ -11,6 +11,6 @@ import { UdtParserBuilder } from "./udtParser";
     UdtBalanceRepo,
     UdtInfoRepo,
   ],
-  exports: [SyncService],
+  exports: [SyncService, UdtParserBuilder],
 })
 export class SyncModule {}
