@@ -23,6 +23,7 @@ export class UdtBalance {
 
   // To roll back on re-org
   @Column({ type: "varchar" })
+  @Index()
   updatedAtHeight: string;
 
   @Column({ type: "text" })

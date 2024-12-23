@@ -19,6 +19,7 @@ export class UdtInfo {
 
   // To roll back on re-org
   @Column({ type: "varchar" })
+  @Index()
   updatedAtHeight: string;
 
   /* === Token type script === */

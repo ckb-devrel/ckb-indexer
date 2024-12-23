@@ -1,11 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import {
-  SyncStatus,
-  UdtBalance,
-  UdtInfo,
-} from "./schemas";
+import { Block, SyncStatus, UdtBalance, UdtInfo } from "./schemas";
 
 @Module({
   imports: [
@@ -19,11 +15,7 @@ import {
         password: configService.get("mysql.password"),
         database: configService.get("mysql.database"),
         synchronize: true,
-        entities: [
-          SyncStatus,
-          UdtInfo,
-          UdtBalance,
-        ],
+        entities: [Block, SyncStatus, UdtInfo, UdtBalance],
       }),
     }),
   ],
