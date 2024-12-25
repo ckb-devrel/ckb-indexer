@@ -153,48 +153,50 @@ export class UdtParser {
           /* === Update UDT Info === */
 
           /* === Update UDT Balance === */
-          for (const diff of diffs) {
-            const address = await this.scriptToAddress(diff.lock);
-            const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
+          await Promise.all(
+            diffs.map(async (diff) => {
+              const address = await this.scriptToAddress(diff.lock);
+              const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
 
-            const existedUdtBalance = await udtBalanceRepo.findOne({
-              where: {
-                addressHash,
-                tokenHash,
-              },
-              order: {
-                updatedAtHeight: "DESC",
-              },
-            });
-            const udtBalance = udtBalanceRepo.create({
-              ...(existedUdtBalance ?? {
-                addressHash,
-                tokenHash,
+              const existedUdtBalance = await udtBalanceRepo.findOne({
+                where: {
+                  addressHash,
+                  tokenHash,
+                },
+                order: {
+                  updatedAtHeight: "DESC",
+                },
+              });
+              const udtBalance = udtBalanceRepo.create({
+                ...(existedUdtBalance ?? {
+                  addressHash,
+                  tokenHash,
 
-                updatedAtHeight: formatSortable(this.blockHeight),
+                  updatedAtHeight: formatSortable(this.blockHeight),
 
-                address,
-                balance: formatSortable("0"),
-                capacity: formatSortable("0"),
-              }),
-              id:
-                existedUdtBalance &&
-                parseSortableInt(existedUdtBalance.updatedAtHeight) ===
-                  this.blockHeight
-                  ? existedUdtBalance.id
-                  : undefined,
-            });
+                  address,
+                  balance: formatSortable("0"),
+                  capacity: formatSortable("0"),
+                }),
+                id:
+                  existedUdtBalance &&
+                  parseSortableInt(existedUdtBalance.updatedAtHeight) ===
+                    this.blockHeight
+                    ? existedUdtBalance.id
+                    : undefined,
+              });
 
-            udtBalance.balance = formatSortableInt(
-              parseSortableInt(udtBalance.balance) + diff.balance,
-            );
-            udtBalance.capacity = formatSortableInt(
-              parseSortableInt(udtBalance.capacity) + diff.capacity,
-            );
+              udtBalance.balance = formatSortableInt(
+                parseSortableInt(udtBalance.balance) + diff.balance,
+              );
+              udtBalance.capacity = formatSortableInt(
+                parseSortableInt(udtBalance.capacity) + diff.capacity,
+              );
 
-            udtBalance.updatedAtHeight = formatSortableInt(this.blockHeight);
-            await udtBalanceRepo.save(udtBalance);
-          }
+              udtBalance.updatedAtHeight = formatSortableInt(this.blockHeight);
+              await udtBalanceRepo.save(udtBalance);
+            }),
+          );
           /* === Update UDT Balance === */
         }
       },
@@ -205,13 +207,15 @@ export class UdtParser {
     const tx = ccc.Transaction.from(txLike);
 
     const scripts: Map<string, ccc.Script> = new Map();
-    for (const input of tx.inputs) {
-      await input.completeExtraInfos(this.context.client);
-      if (!input.cellOutput?.type) {
-        continue;
-      }
-      scripts.set(input.cellOutput.type.hash(), input.cellOutput.type);
-    }
+    await Promise.all(
+      tx.inputs.map(async (input) => {
+        await input.completeExtraInfos(this.context.client);
+        if (!input.cellOutput?.type) {
+          return;
+        }
+        scripts.set(input.cellOutput.type.hash(), input.cellOutput.type);
+      }),
+    );
     for (const output of tx.outputs) {
       if (!output.type) {
         continue;
@@ -268,28 +272,30 @@ export class UdtParser {
     let netBalance = ccc.Zero;
     let netCapacity = ccc.Zero;
 
-    for (const input of tx.inputs) {
-      await input.completeExtraInfos(this.context.client);
-      if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
-        continue;
-      }
-      const lock = input.cellOutput.lock;
-      const lockHash = lock.hash();
-      const diff = diffs.get(lockHash) ?? {
-        lock,
-        balance: ccc.Zero,
-        capacity: ccc.Zero,
-      };
+    await Promise.all(
+      tx.inputs.map(async (input) => {
+        await input.completeExtraInfos(this.context.client);
+        if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
+          return;
+        }
+        const lock = input.cellOutput.lock;
+        const lockHash = lock.hash();
+        const diff = diffs.get(lockHash) ?? {
+          lock,
+          balance: ccc.Zero,
+          capacity: ccc.Zero,
+        };
 
-      const balance = ccc.udtBalanceFrom(input.outputData ?? "00".repeat(16));
-      diff.balance -= balance;
-      diff.capacity -= input.cellOutput.capacity;
+        const balance = ccc.udtBalanceFrom(input.outputData ?? "00".repeat(16));
+        diff.balance -= balance;
+        diff.capacity -= input.cellOutput.capacity;
 
-      diffs.set(lockHash, diff);
+        diffs.set(lockHash, diff);
 
-      netBalance -= balance;
-      netCapacity -= input.cellOutput.capacity;
-    }
+        netBalance -= balance;
+        netCapacity -= input.cellOutput.capacity;
+      }),
+    );
     for (const i in tx.outputs) {
       const output = tx.outputs[i];
       const outputData = tx.outputsData[i];
@@ -405,16 +411,16 @@ export class UdtParser {
       if (decoded) {
         const { outIndex, txId } = decoded;
         const { data } = await this.context.btcRequester.post("/", {
-          method: "gettxout",
-          params: [txId.slice(2), outIndex],
+          method: "getrawtransaction",
+          params: [txId.slice(2), true],
         });
 
-        if (data?.result.scriptPubKey?.address == null) {
+        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
           this.context.logger.warn(
             `Failed to get btc rgbpp utxo ${txId}:${outIndex}`,
           );
         } else {
-          return data.result.scriptPubKey.address;
+          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
         }
       }
     }
