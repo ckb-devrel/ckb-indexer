@@ -1,4 +1,9 @@
-import { autoRun, formatSortableInt, withTransaction } from "@app/commons";
+import {
+  autoRun,
+  formatSortableInt,
+  parseSortableInt,
+  withTransaction,
+} from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -50,8 +55,9 @@ export class SyncService {
   }
 
   async sync() {
-    const pendingHeight =
+    const pendingStatus =
       await this.syncStatusRepo.assertSyncHeight(PENDING_KEY);
+    const pendingHeight = parseSortableInt(pendingStatus.value);
     const tip = await this.client.getTip();
     const endBlock =
       this.blockLimitPerInterval === undefined
@@ -89,7 +95,7 @@ export class SyncService {
             await udtParser.udtInfoHandleTx(entityManager, tx);
           }
 
-          await this.syncStatusRepo.updateSyncHeight(PENDING_KEY, i);
+          await this.syncStatusRepo.updateSyncHeight(pendingStatus, i);
           this.logger.log(
             `Tip ${tip}. Synced block ${i}, ${block.transactions.length} transactions processed`,
           );
@@ -103,11 +109,16 @@ export class SyncService {
       return;
     }
 
-    const pendingHeight =
-      await this.syncStatusRepo.assertSyncHeight(PENDING_KEY);
+    const pendingHeight = parseSortableInt(
+      (await this.syncStatusRepo.assertSyncHeight(PENDING_KEY)).value,
+    );
     const confirmedHeight = pendingHeight - ccc.numFrom(this.confirmations);
 
-    await this.syncStatusRepo.updateSyncHeight(SYNC_KEY, confirmedHeight);
+    const syncedStatus = await this.syncStatusRepo.assertSyncHeight(SYNC_KEY);
+    if (parseSortableInt(syncedStatus.value) >= confirmedHeight) {
+      return;
+    }
+    await this.syncStatusRepo.updateSyncHeight(syncedStatus, confirmedHeight);
     this.logger.log(`Clearing up to height ${confirmedHeight}`);
 
     let deleteUdtInfoCount = 0;
