@@ -28,6 +28,11 @@ export class SyncService {
   private readonly blockLimitPerInterval: number | undefined;
   private readonly confirmations: number | undefined;
 
+  private startTip?: ccc.Num;
+  private startTipTime?: number;
+  private syncedBlocks: number = 0;
+  private syncedBlockTime: number = 0;
+
   constructor(
     configService: ConfigService,
     private readonly udtParserBuilder: UdtParserBuilder,
@@ -58,7 +63,18 @@ export class SyncService {
     const pendingStatus =
       await this.syncStatusRepo.assertSyncHeight(PENDING_KEY);
     const pendingHeight = parseSortableInt(pendingStatus.value);
+
     const tip = await this.client.getTip();
+    const tipTime = Date.now();
+    const tipCost =
+      this.startTip !== undefined && this.startTipTime !== undefined
+        ? (tipTime - this.startTipTime) / Number(tip - this.startTip)
+        : 9999999999;
+    if (this.startTip === undefined || this.startTipTime === undefined) {
+      this.startTip = tip;
+      this.startTipTime = tipTime;
+    }
+
     const endBlock =
       this.blockLimitPerInterval === undefined
         ? tip
@@ -85,6 +101,7 @@ export class SyncService {
         undefined,
         async (entityManager) => {
           const blockRepo = new BlockRepo(entityManager);
+          const syncStatusRepo = new SyncStatusRepo(entityManager);
           await blockRepo.insert({
             hash: block.header.hash,
             parentHash: block.header.parentHash,
@@ -95,13 +112,23 @@ export class SyncService {
             await udtParser.udtInfoHandleTx(entityManager, tx);
           }
 
-          await this.syncStatusRepo.updateSyncHeight(pendingStatus, i);
-          this.logger.log(
-            `Tip ${tip}. Synced block ${i}, ${block.transactions.length} transactions processed`,
-          );
+          await syncStatusRepo.updateSyncHeight(pendingStatus, i);
         },
       );
+
+      this.syncedBlocks += 1;
+
+      const blocksDiff = Number(tip - i);
+      const syncCost =
+        (this.syncedBlockTime + Date.now() - tipTime) / this.syncedBlocks;
+      const estimatedTime =
+        (blocksDiff * syncCost * tipCost) / (tipCost - syncCost);
+      this.logger.log(
+        `Tip ${tip}, synced block ${i}, ${blocksDiff} blocks / ~${estimatedTime !== undefined ? (estimatedTime / 1000 / 60).toFixed(1) : "-"} mins left. ${block.transactions.length} transactions processed`,
+      );
     }
+
+    this.syncedBlockTime += Date.now() - tipTime;
   }
 
   async clear() {
