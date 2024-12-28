@@ -48,6 +48,9 @@ export class UdtInfo {
   @Column({ type: "text", nullable: true })
   owner: string | null;
 
+  @Column({ type: "varchar", nullable: true })
+  maximumSupply: string | null;
+
   /* === Statistic fields === */
   @Column({ type: "varchar" })
   firstIssuanceTxHash: string;

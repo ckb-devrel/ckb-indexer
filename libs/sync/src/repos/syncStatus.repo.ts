@@ -31,6 +31,21 @@ export class SyncStatusRepo extends Repository<SyncStatus> {
     return found;
   }
 
+  async syncHeight(
+    key: string,
+    defaultValue?: ccc.NumLike,
+  ): Promise<SyncStatus> {
+    const found = await this.findOneBy({ key });
+    if (!found) {
+      if (defaultValue === undefined) {
+        throw Error(`Sync status not found: ${key}`);
+      }
+      return await this.create({ key, value: formatSortableInt(defaultValue) });
+    }
+
+    return found;
+  }
+
   async updateSyncHeight(
     status: SyncStatus,
     height: ccc.NumLike,

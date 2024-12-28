@@ -65,7 +65,10 @@ export class SyncService {
   }
 
   async sync() {
-    const pendingStatus = await this.syncStatusRepo.syncHeight(PENDING_KEY, this.blockSyncStart);
+    const pendingStatus = await this.syncStatusRepo.syncHeight(
+      PENDING_KEY,
+      this.blockSyncStart,
+    );
     const pendingHeight = parseSortableInt(pendingStatus.value);
 
     const tip = await this.client.getTip();
