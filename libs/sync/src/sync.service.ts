@@ -26,6 +26,7 @@ export class SyncService {
   private readonly logger = new Logger(SyncService.name);
   private readonly client: ccc.Client;
   private readonly blockLimitPerInterval: number | undefined;
+  private readonly blockSyncStart: number | undefined;
   private readonly confirmations: number | undefined;
 
   private startTip?: ccc.Num;
@@ -46,6 +47,7 @@ export class SyncService {
     this.blockLimitPerInterval = configService.get<number>(
       "sync.blockLimitPerInterval",
     );
+    this.blockSyncStart = configService.get<number>("sync.blockSyncStart");
     this.confirmations = configService.get<number>("sync.confirmations");
 
     const syncInterval = configService.get<number>("sync.interval");
@@ -60,8 +62,10 @@ export class SyncService {
   }
 
   async sync() {
-    const pendingStatus =
-      await this.syncStatusRepo.assertSyncHeight(PENDING_KEY);
+    const pendingStatus = await this.syncStatusRepo.syncHeight(
+      PENDING_KEY,
+      this.blockSyncStart,
+    );
     const pendingHeight = parseSortableInt(pendingStatus.value);
 
     const tip = await this.client.getTip();
@@ -106,6 +110,7 @@ export class SyncService {
             hash: block.header.hash,
             parentHash: block.header.parentHash,
             height: formatSortableInt(block.header.number),
+            timestamp: formatSortableInt(block.header.timestamp),
           });
 
           for (const tx of block.transactions) {

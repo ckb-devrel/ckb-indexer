@@ -55,9 +55,44 @@ export class UdtParserBuilder {
   build(blockHeight: ccc.NumLike): UdtParser {
     return new UdtParser(this, ccc.numFrom(blockHeight));
   }
+
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    const script = ccc.Script.from(scriptLike);
+
+    if (
+      script.codeHash === this.rgbppBtcCodeHash &&
+      script.hashType === this.rgbppBtcHashType
+    ) {
+      const decoded = (() => {
+        try {
+          return RgbppLockArgs.decode(script.args);
+        } catch (err) {
+          this.logger.warn(
+            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
+          );
+        }
+      })();
+
+      if (decoded) {
+        const { outIndex, txId } = decoded;
+        const { data } = await this.btcRequester.post("/", {
+          method: "getrawtransaction",
+          params: [txId.slice(2), true],
+        });
+
+        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+          this.logger.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
+        } else {
+          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
+        }
+      }
+    }
+
+    return ccc.Address.fromScript(script, this.client).toString();
+  }
 }
 
-export class UdtParser {
+class UdtParser {
   constructor(
     public readonly context: UdtParserBuilder,
     public readonly blockHeight: ccc.Num,
@@ -155,7 +190,7 @@ export class UdtParser {
           /* === Update UDT Balance === */
           await Promise.all(
             diffs.map(async (diff) => {
-              const address = await this.scriptToAddress(diff.lock);
+              const address = await this.context.scriptToAddress(diff.lock);
               const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
 
               const existedUdtBalance = await udtBalanceRepo.findOne({
@@ -389,43 +424,6 @@ export class UdtParser {
     }
 
     return { name: null, symbol: null, decimals: null };
-  }
-
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    const script = ccc.Script.from(scriptLike);
-
-    if (
-      script.codeHash === this.context.rgbppBtcCodeHash &&
-      script.hashType === this.context.rgbppBtcHashType
-    ) {
-      const decoded = (() => {
-        try {
-          return RgbppLockArgs.decode(script.args);
-        } catch (err) {
-          this.context.logger.warn(
-            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-          );
-        }
-      })();
-
-      if (decoded) {
-        const { outIndex, txId } = decoded;
-        const { data } = await this.context.btcRequester.post("/", {
-          method: "getrawtransaction",
-          params: [txId.slice(2), true],
-        });
-
-        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-          this.context.logger.warn(
-            `Failed to get btc rgbpp utxo ${txId}:${outIndex}`,
-          );
-        } else {
-          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
-        }
-      }
-    }
-
-    return ccc.Address.fromScript(script, this.context.client).toString();
   }
 }
 
