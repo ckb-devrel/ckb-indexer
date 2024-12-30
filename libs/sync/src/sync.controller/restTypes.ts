@@ -1,16 +1,5 @@
 import { ccc } from "@ckb-ccc/core";
-
-export enum RpcError {
-  TokenNotFound,
-  TxNotFound,
-  BlockNotFound,
-}
-
-export const RpcErrorMessage: Record<RpcError, string> = {
-  [RpcError.TokenNotFound]: "Token not found",
-  [RpcError.TxNotFound]: "Tx not found",
-  [RpcError.BlockNotFound]: "Block not found",
-};
+import { ScriptMode } from "../sync.agent";
 
 export enum Chain {
   Ckb = "ckb",
@@ -21,7 +10,7 @@ export interface CellScript {
   codeHash: ccc.Hex;
   hashType: ccc.HashType;
   args: ccc.Hex;
-  codeHashType?: "xUDT" | "Spore";
+  codeHashType?: ScriptMode;
 }
 
 export interface TokenData {
@@ -38,15 +27,14 @@ export interface TokenInfo {
   symbol?: string;
   decimal?: number;
   owner?: string;
-  totalAmount?: ccc.Num;
-  supplyLimit: ccc.Num;
+  totalAmount: ccc.Num;
   mintable: boolean;
   holderCount: ccc.Num;
   rgbppTag: boolean;
   issueChain: Chain;
   issueTxId: ccc.Hex;
   issueTxHeight: ccc.Num;
-  issueTime: ccc.Num;
+  issueTime: number;
 }
 
 export interface TokenBalance {
@@ -60,7 +48,7 @@ export interface TokenBalance {
 
 export interface TokenCell {
   txId: ccc.Hex;
-  vout: ccc.Num;
+  vout: number;
   lockScript: CellScript;
   typeScript: CellScript;
   ownerAddress: string;
@@ -69,15 +57,15 @@ export interface TokenCell {
   spent: boolean;
   spenderTx?: ccc.Hex;
   isomorphicBtcTx?: ccc.Hex;
-  isomorphicBtcTxVout?: ccc.Num;
+  isomorphicBtcTxVout?: number;
 }
 
 export interface BlockHeader {
-  number: ccc.Num;
+  height: ccc.Num;
   hash: ccc.Hex;
   preHash: ccc.Hex;
-  timestamp: ccc.Num;
-  version: ccc.Num;
+  timestamp: number;
+  version: number;
 }
 
 export interface TrackerInfo {
@@ -85,7 +73,6 @@ export interface TrackerInfo {
   trackerBestBlockHash: ccc.Hex;
   nodeBlockHeight: ccc.Num;
   nodeBestBlockHash: ccc.Hex;
-  latestBlockHeight: ccc.Num;
 }
 
 export interface ClusterData {

@@ -9,9 +9,10 @@ import {
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { Axios } from "axios";
+import { Axios } from "axios";
 import { EntityManager } from "typeorm";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import { SyncAgent } from "./sync.agent";
 
 @Injectable()
 export class UdtParserBuilder {
@@ -27,6 +28,7 @@ export class UdtParserBuilder {
   constructor(
     configService: ConfigService,
     public readonly entityManager: EntityManager,
+    public readonly syncAgent: SyncAgent,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -53,41 +55,6 @@ export class UdtParserBuilder {
 
   build(blockHeight: ccc.NumLike): UdtParser {
     return new UdtParser(this, ccc.numFrom(blockHeight));
-  }
-
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    const script = ccc.Script.from(scriptLike);
-
-    if (
-      script.codeHash === this.rgbppBtcCodeHash &&
-      script.hashType === this.rgbppBtcHashType
-    ) {
-      const decoded = (() => {
-        try {
-          return RgbppLockArgs.decode(script.args);
-        } catch (err) {
-          this.logger.warn(
-            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-          );
-        }
-      })();
-
-      if (decoded) {
-        const { outIndex, txId } = decoded;
-        const { data } = await this.btcRequester.post("/", {
-          method: "getrawtransaction",
-          params: [txId.slice(2), true],
-        });
-
-        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-          this.logger.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
-        } else {
-          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
-        }
-      }
-    }
-
-    return ccc.Address.fromScript(script, this.client).toString();
   }
 }
 
@@ -226,7 +193,9 @@ class UdtParser {
           /* === Update UDT Balance === */
           await Promise.all(
             diffs.map(async (diff) => {
-              const address = await this.context.scriptToAddress(diff.lock);
+              const { address } = await this.context.syncAgent.scriptToAddress(
+                diff.lock,
+              );
               const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
 
               const existedUdtBalance = await udtBalanceRepo.findOne({
