@@ -9,7 +9,7 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     super(UdtBalance, manager);
   }
 
-  async getTokenBalance(
+  async getTokenByAddress(
     address: string,
     tokenHash?: ccc.HexLike,
   ): Promise<UdtBalance[]> {
@@ -22,6 +22,10 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     } else {
       return await this.findBy({ addressHash });
     }
+  }
+
+  async getTokenByTokenId(tokenHash: ccc.HexLike): Promise<UdtBalance[]> {
+    return await this.findBy({ tokenHash: ccc.hexFrom(tokenHash) });
   }
 
   async getItemCountByTokenHash(tokenHash: ccc.HexLike): Promise<number> {

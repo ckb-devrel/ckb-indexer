@@ -110,7 +110,7 @@ export class SyncService {
             hash: block.header.hash,
             parentHash: block.header.parentHash,
             height: formatSortableInt(block.header.number),
-            timestamp: formatSortableInt(block.header.timestamp),
+            timestamp: Number(block.header.timestamp),
           });
 
           for (const tx of block.transactions) {

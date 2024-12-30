@@ -1,59 +1,90 @@
-import { parseSortableInt } from "@app/commons";
+import { assert, asyncMap, asyncSome, RpcError } from "@app/commons";
+import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get, Query } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { UdtBalanceRepo, UdtInfoRepo } from "../repos";
-import { BlockRepo } from "../repos/block.repo";
+import { ScriptMode, SyncAgent } from "../sync.agent";
 import {
+  BlockHeader,
   Chain,
-  RpcError,
-  RpcErrorMessage,
   TokenBalance,
+  TokenCell,
   TokenInfo,
+  TrackerInfo,
 } from "./restTypes";
-
-function assert<T>(
-  expression: T | undefined | null,
-  message: string | RpcError,
-): T {
-  if (!expression) {
-    if (typeof message === "string") {
-      throw new Error(message);
-    } else {
-      throw new Error(RpcErrorMessage[message]);
-    }
-  }
-  return expression;
-}
-
-function assertConfig<T>(config: ConfigService, key: string): T {
-  return assert(config.get<T>(key), `Missing config: ${key}`);
-}
 
 @Controller()
 export class SyncController {
-  private readonly client: ccc.Client;
-  public readonly rgbppBtcCodeHash: ccc.Hex;
-  public readonly rgbppBtcHashType: ccc.HashType;
+  constructor(private readonly syncAgent: SyncAgent) {}
 
-  constructor(
-    private readonly udtInfoRepo: UdtInfoRepo,
-    private readonly udtBalanceRepo: UdtBalanceRepo,
-    private readonly blockRepo: BlockRepo,
-    private readonly configService: ConfigService,
-  ) {
-    const isMainnet = configService.get<boolean>("sync.isMainnet");
-    const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
-    this.client = isMainnet
-      ? new ccc.ClientPublicMainnet({ url: ckbRpcUri })
-      : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
+  async udtBalanceToTokenBalance(
+    udtBalance: UdtBalance,
+  ): Promise<TokenBalance> {
+    const { udtInfo } = assert(
+      await this.syncAgent.getTokenInfo(udtBalance.tokenHash),
+      RpcError.TokenNotFound,
+    );
+    return {
+      tokenId: ccc.hexFrom(udtBalance.tokenHash),
+      name: udtInfo.name ?? undefined,
+      symbol: udtInfo.symbol ?? undefined,
+      decimal: udtInfo.decimals ?? undefined,
+      address: udtBalance.address,
+      balance: ccc.numFrom(udtBalance.balance),
+    };
+  }
 
-    this.rgbppBtcCodeHash = ccc.hexFrom(
-      assertConfig(configService, "sync.rgbppBtcCodeHash"),
+  async cellToTokenCell(
+    cell: ccc.Cell,
+    spenderTx?: ccc.Hex,
+  ): Promise<TokenCell> {
+    const { address, btc } = await this.syncAgent.scriptToAddress(
+      cell.cellOutput.lock,
     );
-    this.rgbppBtcHashType = ccc.hashTypeFrom(
-      assertConfig(configService, "sync.rgbppBtcHashType"),
+    return {
+      txId: cell.outPoint.txHash,
+      vout: Number(cell.outPoint.index),
+      lockScript: {
+        ...cell.cellOutput.lock,
+        codeHashType: await this.syncAgent.parseScriptMode(
+          cell.cellOutput.lock,
+        ),
+      },
+      typeScript: {
+        ...cell.cellOutput.type!,
+        codeHashType: await this.syncAgent.parseScriptMode(
+          cell.cellOutput.type!,
+        ),
+      },
+      ownerAddress: address,
+      capacity: ccc.numFrom(cell.cellOutput.capacity),
+      data: cell.outputData,
+      spent: spenderTx !== undefined,
+      spenderTx,
+      isomorphicBtcTx: btc ? ccc.hexFrom(btc.txId) : undefined,
+      isomorphicBtcTxVout: btc ? btc.outIndex : undefined,
+    };
+  }
+
+  @Get("/getTrackerInfo")
+  async getTrackerInfo(): Promise<TrackerInfo> {
+    const dbTip = assert(
+      await this.syncAgent.getBlockHeader({
+        fromDb: false,
+      }),
+      RpcError.BlockNotFound,
     );
+    const nodeTip = assert(
+      await this.syncAgent.getBlockHeader({
+        fromDb: true,
+      }),
+      RpcError.BlockNotFound,
+    );
+    return {
+      trackerBlockHeight: dbTip.height,
+      trackerBestBlockHash: dbTip.hash,
+      nodeBlockHeight: nodeTip.height,
+      nodeBestBlockHash: nodeTip.hash,
+    };
   }
 
   @Get("/getTokenInfo")
@@ -61,27 +92,22 @@ export class SyncController {
     @Query()
     tokenId: string,
   ): Promise<TokenInfo> {
-    const udtInfo = assert(
-      await this.udtInfoRepo.getTokenInfoByTokenId(tokenId),
+    const { udtInfo, tx, block } = assert(
+      await this.syncAgent.getTokenInfo(tokenId, true),
       RpcError.TokenNotFound,
     );
-    const issueTx = assert(
-      await this.client.getTransaction(udtInfo.firstIssuanceTxHash),
-      RpcError.TxNotFound,
-    );
-    const issueBlock = assert(
-      await this.blockRepo.getBlock({
-        hash: issueTx.blockHash,
-        number: issueTx.blockNumber,
-      }),
-      RpcError.BlockNotFound,
-    );
-    const holderCount =
-      await this.udtBalanceRepo.getItemCountByTokenHash(tokenId);
-    const rgbppIssue = issueTx.transaction.outputs.some((output) => {
+    const issueTx = assert(tx, RpcError.TxNotFound);
+    const issueBlock = assert(block, RpcError.BlockNotFound);
+    const holderCount = await this.syncAgent.getTokenHoldersCount(tokenId);
+    const rgbppIssue = await asyncSome(issueTx.outputs, async (output) => {
       return (
-        output.lock.codeHash === this.rgbppBtcCodeHash &&
-        output.lock.hashType === this.rgbppBtcHashType
+        (await this.syncAgent.parseScriptMode(output.lock)) === ScriptMode.Rgbpp
+      );
+    });
+    const oneTimeIssue = await asyncSome(issueTx.outputs, async (output) => {
+      return (
+        (await this.syncAgent.parseScriptMode(output.lock)) ===
+        ScriptMode.SingleUseLock
       );
     });
     return {
@@ -90,44 +116,79 @@ export class SyncController {
       symbol: udtInfo.symbol ?? undefined,
       decimal: udtInfo.decimals ?? undefined,
       owner: udtInfo.owner ?? undefined,
-      totalAmount: udtInfo.maximumSupply
-        ? ccc.numFrom(udtInfo.maximumSupply)
-        : undefined,
-      supplyLimit: ccc.numFrom(udtInfo.totalSupply),
-      mintable: !rgbppIssue,
+      totalAmount: ccc.numFrom(udtInfo.totalSupply),
+      mintable: !rgbppIssue && !oneTimeIssue,
       holderCount: ccc.numFrom(holderCount),
       rgbppTag: rgbppIssue,
       issueChain: rgbppIssue ? Chain.Btc : Chain.Ckb,
       issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),
-      issueTxHeight: parseSortableInt(issueBlock.height),
-      issueTime: parseSortableInt(issueBlock.timestamp),
+      issueTxHeight: issueBlock.height,
+      issueTime: issueBlock.timestamp,
     };
   }
 
-  @Get("/getTokenBalance")
+  @Get("/getTokenBalances")
   async getTokenBalances(
     address: string,
     tokenId?: string,
   ): Promise<TokenBalance[]> {
-    const udtBalances = await this.udtBalanceRepo.getTokenBalance(
-      address,
-      tokenId,
+    const udtBalances = await this.syncAgent.getTokenBalance(address, tokenId);
+    return await asyncMap(udtBalances, this.udtBalanceToTokenBalance);
+  }
+
+  @Get("/getCellByOutpoint")
+  async getCellByOutpoint(txHash: string, index: number): Promise<TokenCell> {
+    const { cell, spentTx } = assert(
+      await this.syncAgent.getCellByOutpoint(txHash, index),
+      RpcError.CkbCellNotFound,
     );
-    const tokenBalances = new Array<TokenBalance>();
-    for (const udtBalance of udtBalances) {
-      const udtInfo = assert(
-        await this.udtInfoRepo.getTokenInfoByTokenId(udtBalance.tokenHash),
-        RpcError.TokenNotFound,
-      );
-      tokenBalances.push({
-        tokenId: ccc.hexFrom(udtBalance.tokenHash),
-        name: udtInfo.name ?? undefined,
-        symbol: udtInfo.symbol ?? undefined,
-        decimal: udtInfo.decimals ?? undefined,
-        address: address,
-        balance: ccc.numFrom(udtBalance.balance),
-      });
-    }
-    return tokenBalances;
+    assert(cell.cellOutput.type, RpcError.CellNotAsset);
+    return await this.cellToTokenCell(cell, spentTx);
+  }
+
+  @Get("/getLatestBlock")
+  async getLatestBlock(): Promise<BlockHeader> {
+    const tipHeader = assert(
+      await this.syncAgent.getBlockHeader({
+        fromDb: false,
+      }),
+      RpcError.BlockNotFound,
+    );
+    return {
+      preHash: tipHeader.parentHash,
+      ...tipHeader,
+    };
+  }
+
+  @Get("/getBlockHeaderByNumber")
+  async getBlockHeaderByNumber(blockNumber: number): Promise<BlockHeader> {
+    const blockHeader = await this.syncAgent.getBlockHeader({
+      blockNumber,
+      fromDb: false,
+    });
+    assert(blockHeader, RpcError.BlockNotFound);
+    return {
+      preHash: blockHeader!.parentHash,
+      ...blockHeader!,
+    };
+  }
+
+  @Get("/getTokenHolders")
+  async getTokenHolders(tokenId: string): Promise<TokenBalance[]> {
+    const udtBalances = await this.syncAgent.getTokenAllBalances(tokenId);
+    return await asyncMap(udtBalances, this.udtBalanceToTokenBalance);
+  }
+
+  @Get("/getIsomorphicCellByUtxo")
+  async getIsomorphicCellByUtxo(
+    btcTxHash: string,
+    index: number,
+  ): Promise<TokenCell> {
+    const { cell, spentTx } = assert(
+      await this.syncAgent.getRgbppCellByUtxo(btcTxHash, index),
+      RpcError.RgbppCellNotFound,
+    );
+    assert(cell.cellOutput.type, RpcError.CellNotAsset);
+    return await this.cellToTokenCell(cell, spentTx);
   }
 }

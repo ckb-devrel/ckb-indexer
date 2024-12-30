@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 export function sleep(time: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, time));
@@ -30,4 +31,59 @@ export function autoRun(
       }
     })();
   }
+}
+
+export async function asyncSome<T>(
+  arr: T[],
+  predicate: (item: T) => Promise<boolean>,
+) {
+  for (const item of arr) {
+    if (await predicate(item)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export async function asyncMap<T, R>(
+  arr: T[],
+  mapper: (item: T) => Promise<R>,
+) {
+  return Promise.all(arr.map(mapper));
+}
+
+export enum RpcError {
+  TokenNotFound,
+  TxNotFound,
+  BlockNotFound,
+  CkbCellNotFound,
+  RgbppCellNotFound,
+  CellNotAsset,
+}
+
+export const RpcErrorMessage: Record<RpcError, string> = {
+  [RpcError.TokenNotFound]: "Token not found",
+  [RpcError.TxNotFound]: "Tx not found",
+  [RpcError.BlockNotFound]: "Block not found",
+  [RpcError.CkbCellNotFound]: "Cell on ckb not found",
+  [RpcError.RgbppCellNotFound]: "Rgbpp cell on ckb not found",
+  [RpcError.CellNotAsset]: "Cell is not an asset",
+};
+
+export function assert<T>(
+  expression: T | undefined | null,
+  message: string | RpcError,
+): T {
+  if (!expression) {
+    if (typeof message === "string") {
+      throw new Error(message);
+    } else {
+      throw new Error(RpcErrorMessage[message]);
+    }
+  }
+  return expression;
+}
+
+export function assertConfig<T>(config: ConfigService, key: string): T {
+  return assert(config.get<T>(key), `Missing config: ${key}`);
 }

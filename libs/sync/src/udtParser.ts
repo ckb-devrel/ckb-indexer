@@ -7,16 +7,16 @@ import {
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { Axios } from "axios";
+import { Axios } from "axios";
 import { EntityManager } from "typeorm";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import { SyncAgent } from "./sync.agent";
 
 @Injectable()
 export class UdtParserBuilder {
   public readonly logger = new Logger(UdtParserBuilder.name);
   public readonly requester: Axios;
   public readonly client: ccc.Client;
-  public readonly btcRequester: Axios;
 
   public readonly rgbppBtcCodeHash: ccc.Hex;
   public readonly rgbppBtcHashType: ccc.HashType;
@@ -24,20 +24,9 @@ export class UdtParserBuilder {
   constructor(
     configService: ConfigService,
     public readonly entityManager: EntityManager,
+    public readonly syncAgent: SyncAgent,
   ) {
-    const isMainnet = configService.get<boolean>("sync.isMainnet");
-    const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
-    this.client = isMainnet
-      ? new ccc.ClientPublicMainnet({ url: ckbRpcUri })
-      : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
-
-    const btcRpcUri = configService.get<string>("sync.btcRpcUri");
-    if (!btcRpcUri) {
-      throw Error("Missing sync.btcRpcUri");
-    }
-    this.btcRequester = axios.create({
-      baseURL: btcRpcUri,
-    });
+    this.client = syncAgent.rpc();
 
     const btcCodeHash = configService.get<string>("sync.rgbppBtcCodeHash");
     if (!btcCodeHash) {
@@ -54,41 +43,6 @@ export class UdtParserBuilder {
 
   build(blockHeight: ccc.NumLike): UdtParser {
     return new UdtParser(this, ccc.numFrom(blockHeight));
-  }
-
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    const script = ccc.Script.from(scriptLike);
-
-    if (
-      script.codeHash === this.rgbppBtcCodeHash &&
-      script.hashType === this.rgbppBtcHashType
-    ) {
-      const decoded = (() => {
-        try {
-          return RgbppLockArgs.decode(script.args);
-        } catch (err) {
-          this.logger.warn(
-            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-          );
-        }
-      })();
-
-      if (decoded) {
-        const { outIndex, txId } = decoded;
-        const { data } = await this.btcRequester.post("/", {
-          method: "getrawtransaction",
-          params: [txId.slice(2), true],
-        });
-
-        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-          this.logger.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
-        } else {
-          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
-        }
-      }
-    }
-
-    return ccc.Address.fromScript(script, this.client).toString();
   }
 }
 
@@ -190,7 +144,9 @@ class UdtParser {
           /* === Update UDT Balance === */
           await Promise.all(
             diffs.map(async (diff) => {
-              const address = await this.context.scriptToAddress(diff.lock);
+              const { address } = await this.context.syncAgent.scriptToAddress(
+                diff.lock,
+              );
               const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
 
               const existedUdtBalance = await udtBalanceRepo.findOne({
@@ -426,12 +382,3 @@ class UdtParser {
     return { name: null, symbol: null, decimals: null };
   }
 }
-
-const RgbppLockArgs = ccc.mol.struct({
-  outIndex: ccc.mol.Uint32,
-  // No idea why the txId is reversed
-  txId: ccc.mol.Byte32.map({
-    inMap: (v: ccc.HexLike) => ccc.bytesFrom(v).reverse(),
-    outMap: (v) => ccc.hexFrom(ccc.bytesFrom(v).reverse()),
-  }),
-});

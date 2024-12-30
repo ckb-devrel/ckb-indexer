@@ -19,7 +19,15 @@ export class BlockRepo extends Repository<Block> {
     return await this.findOneBy({ height });
   }
 
-  async getBlock(params: {
+  async getTipBlock(): Promise<Block | undefined> {
+    const blocks = await this.find({
+      order: { height: "DESC" },
+      take: 1,
+    });
+    return blocks[0];
+  }
+
+  async getBlockByHashOrNumber(params: {
     hash?: ccc.Hex;
     number?: ccc.Num;
   }): Promise<Block | null> {

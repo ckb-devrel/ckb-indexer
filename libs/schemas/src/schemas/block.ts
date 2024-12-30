@@ -22,8 +22,8 @@ export class Block {
   @Column({ type: "varchar" })
   height: string;
 
-  @Column({ type: "varchar" })
-  timestamp: string;
+  @Column({ type: "int" })
+  timestamp: number;
 
   @CreateDateColumn()
   createdAt: Date;
