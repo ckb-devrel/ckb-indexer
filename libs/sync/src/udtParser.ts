@@ -14,8 +14,8 @@ import { EntityManager } from "typeorm";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
-export class UdtParserBuilder {
-  public readonly logger = new Logger(UdtParserBuilder.name);
+export class UdtParser {
+  public readonly logger = new Logger(UdtParser.name);
   public readonly btcRequester: AxiosInstance;
   public readonly client: ccc.Client;
 
@@ -51,58 +51,36 @@ export class UdtParserBuilder {
     this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
   }
 
-  build(blockHeight: ccc.NumLike): UdtParser {
-    return new UdtParser(this, ccc.numFrom(blockHeight));
-  }
-}
-
-class UdtParser {
-  constructor(
-    public readonly context: UdtParserBuilder,
-    public readonly blockHeight: ccc.Num,
-  ) {}
-
-  async scriptToAddress(
-    scriptLike: ccc.ScriptLike,
-  ): Promise<{ address: string; btc?: { txId: string; outIndex: number } }> {
-    try {
-      return await parseAddress(scriptLike, this.context.client, {
-        btcRequester: this.context.btcRequester,
-        rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
-        rgbppBtcHashType: this.context.rgbppBtcHashType,
-      });
-    } catch (error) {
-      this.context.logger.error(`Failed to parse address: ${error}`);
-      return {
-        address: ccc.Address.fromScript(
-          scriptLike,
-          this.context.client,
-        ).toString(),
-      };
-    }
+  async udtInfoHandleTx(tx: ccc.Transaction) {
+    return Promise.all(
+      (await this.getUdtTypesInTx(tx)).map(async (udtType) => ({
+        ...(await this.getBalanceDiffInTx(tx, udtType)),
+        udtType,
+      })),
+    );
   }
 
-  async udtInfoHandleTx(
+  async saveDiffs(
     entityManager: EntityManager,
-    txLike: ccc.TransactionLike,
+    tx: ccc.Transaction,
+    blockHeight: ccc.Num,
+    udtDiffs: {
+      udtType: ccc.Script;
+      diffs: { address: string; balance: ccc.Num; capacity: ccc.Num }[];
+      netBalance: ccc.Num;
+      netCapacity: ccc.Num;
+    }[],
   ) {
-    const tx = ccc.Transaction.from(txLike);
     const txHash = tx.hash();
-
-    const udtTypes = await this.getUdtTypesInTx(tx);
-
     await withTransaction(
-      this.context.entityManager,
+      this.entityManager,
       entityManager,
       async (entityManager) => {
         const udtInfoRepo = new UdtInfoRepo(entityManager);
         const udtBalanceRepo = new UdtBalanceRepo(entityManager);
 
-        for (const udtType of udtTypes) {
+        for (const { udtType, diffs, netBalance, netCapacity } of udtDiffs) {
           const tokenHash = udtType.hash();
-
-          const { diffs, netBalance, netCapacity } =
-            await this.getBalanceDiffInTx(tx, udtType);
 
           /* === Update UDT Info === */
           const existedUdtInfo = await udtInfoRepo.findOne({
@@ -118,7 +96,7 @@ class UdtParser {
             ...(existedUdtInfo ?? {
               hash: tokenHash,
 
-              updatedAtHeight: formatSortable(this.blockHeight),
+              updatedAtHeight: formatSortable(blockHeight),
 
               typeCodeHash: udtType.codeHash,
               typeHashType: udtType.hashType,
@@ -130,8 +108,7 @@ class UdtParser {
             }),
             id:
               existedUdtInfo &&
-              parseSortableInt(existedUdtInfo.updatedAtHeight) ===
-                this.blockHeight
+              parseSortableInt(existedUdtInfo.updatedAtHeight) === blockHeight
                 ? existedUdtInfo.id
                 : undefined,
           });
@@ -161,11 +138,11 @@ class UdtParser {
             }
           }
 
-          udtInfo.updatedAtHeight = formatSortableInt(this.blockHeight);
+          udtInfo.updatedAtHeight = formatSortableInt(blockHeight);
           await udtInfoRepo.save(udtInfo);
 
           if (!existedUdtInfo) {
-            this.context.logger.log(
+            this.logger.log(
               `New token ${tokenHash} ${udtInfo.name}(${udtInfo.symbol}) found at tx ${txHash}`,
             );
           }
@@ -174,8 +151,9 @@ class UdtParser {
           /* === Update UDT Balance === */
           await Promise.all(
             diffs.map(async (diff) => {
-              const { address, btc } = await this.scriptToAddress(diff.lock);
-              const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
+              const addressHash = ccc.hashCkb(
+                ccc.bytesFrom(diff.address, "utf8"),
+              );
 
               const existedUdtBalance = await udtBalanceRepo.findOne({
                 where: {
@@ -191,22 +169,16 @@ class UdtParser {
                   addressHash,
                   tokenHash,
 
-                  updatedAtHeight: formatSortable(this.blockHeight),
+                  updatedAtHeight: formatSortable(blockHeight),
 
-                  address,
-                  ckbAddress: btc
-                    ? ccc.Address.fromScript(
-                        diff.lock,
-                        this.context.client,
-                      ).toString()
-                    : undefined,
+                  address: diff.address,
                   balance: formatSortable("0"),
                   capacity: formatSortable("0"),
                 }),
                 id:
                   existedUdtBalance &&
                   parseSortableInt(existedUdtBalance.updatedAtHeight) ===
-                    this.blockHeight
+                    blockHeight
                     ? existedUdtBalance.id
                     : undefined,
               });
@@ -218,7 +190,7 @@ class UdtParser {
                 parseSortableInt(udtBalance.capacity) + diff.capacity,
               );
 
-              udtBalance.updatedAtHeight = formatSortableInt(this.blockHeight);
+              udtBalance.updatedAtHeight = formatSortableInt(blockHeight);
               await udtBalanceRepo.save(udtBalance);
             }),
           );
@@ -228,40 +200,47 @@ class UdtParser {
     );
   }
 
-  async getUdtTypesInTx(txLike: ccc.TransactionLike): Promise<ccc.Script[]> {
-    const tx = ccc.Transaction.from(txLike);
+  async getUdtTypesInTx(tx: ccc.Transaction): Promise<ccc.Script[]> {
+    const scripts: ccc.Bytes[] = [];
+    await Promise.all(
+      tx.inputs.map(async (input) => {
+        if (!input.cellOutput?.type) {
+          return;
+        }
+        const rawType = input.cellOutput.type.toBytes();
 
-    const scripts: Map<string, ccc.Script> = new Map();
-    tx.inputs.forEach((input) => {
-      if (!input.cellOutput?.type) {
-        return;
-      }
-      scripts.set(input.cellOutput.type.hash(), input.cellOutput.type);
-    });
+        if (!scripts.some((s) => ccc.bytesEq(s, rawType))) {
+          scripts.push(rawType);
+        }
+      }),
+    );
     for (const output of tx.outputs) {
       if (!output.type) {
         continue;
       }
-      scripts.set(output.type.hash(), output.type);
+      const rawType = output.type.toBytes();
+
+      if (!scripts.some((s) => ccc.bytesEq(s, rawType))) {
+        scripts.push(rawType);
+      }
     }
 
-    return ccc.reduceAsync(
-      Array.from(scripts.values()),
-      async (acc: ccc.Script[], script) => {
-        if (!(await this.isTypeUdt(script))) {
-          return;
-        }
-        acc.push(script);
-      },
-      [],
-    );
+    return (
+      await Promise.all(
+        scripts.map(async (raw) => {
+          const script = ccc.Script.fromBytes(raw);
+          if (!(await this.isTypeUdt(script))) {
+            return;
+          }
+          return script;
+        }),
+      )
+    ).filter((s) => s !== undefined);
   }
 
-  async isTypeUdt(scriptLike: ccc.ScriptLike): Promise<boolean> {
-    const script = ccc.Script.from(scriptLike);
-
+  async isTypeUdt(script: ccc.Script): Promise<boolean> {
     if (
-      this.context.udtTypes.some(
+      this.udtTypes.some(
         ({ codeHash, hashType }) =>
           script.codeHash === codeHash && script.hashType === hashType,
       )
@@ -276,84 +255,89 @@ class UdtParser {
   }
 
   async getBalanceDiffInTx(
-    txLike: ccc.TransactionLike,
-    udtTypeLike: ccc.ScriptLike,
+    tx: ccc.Transaction,
+    udtType: ccc.Script,
   ): Promise<{
-    diffs: { lock: ccc.Script; balance: ccc.Num; capacity: ccc.Num }[];
+    diffs: { address: string; balance: ccc.Num; capacity: ccc.Num }[];
     netBalance: ccc.Num;
     netCapacity: ccc.Num;
   }> {
-    const tx = ccc.Transaction.from(txLike);
-    const udtType = ccc.Script.from(udtTypeLike);
-
-    const diffs: Map<
-      string,
-      { lock: ccc.Script; balance: ccc.Num; capacity: ccc.Num }
-    > = new Map();
+    const diffs: { address: string; balance: ccc.Num; capacity: ccc.Num }[] =
+      [];
     let netBalance = ccc.Zero;
     let netCapacity = ccc.Zero;
 
-    tx.inputs.forEach((input) => {
-      if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
-        return;
-      }
-      const lock = input.cellOutput.lock;
-      const lockHash = lock.hash();
-      const diff = diffs.get(lockHash) ?? {
-        lock,
-        balance: ccc.Zero,
-        capacity: ccc.Zero,
-      };
+    await Promise.all(
+      tx.inputs.map(async (input) => {
+        if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
+          return;
+        }
+        const address = await this.scriptToAddress(input.cellOutput.lock);
 
-      const balance = ccc.udtBalanceFrom(input.outputData ?? "00".repeat(16));
-      diff.balance -= balance;
-      diff.capacity -= input.cellOutput.capacity;
+        const diff =
+          diffs.find((d) => d.address === address) ??
+          diffs[
+            diffs.push({
+              address,
+              balance: ccc.Zero,
+              capacity: ccc.Zero,
+            }) - 1
+          ];
 
-      diffs.set(lockHash, diff);
+        const balance = ccc.udtBalanceFrom(
+          (input.outputData ?? "") + "00".repeat(16),
+        );
+        diff.balance -= balance;
+        diff.capacity -= input.cellOutput.capacity;
 
-      netBalance -= balance;
-      netCapacity -= input.cellOutput.capacity;
-    });
-    for (const i in tx.outputs) {
-      const output = tx.outputs[i];
-      const outputData = tx.outputsData[i];
+        netBalance -= balance;
+        netCapacity -= input.cellOutput.capacity;
+      }),
+    );
 
-      if (!output.type || !output.type.eq(udtType)) {
-        continue;
-      }
+    await Promise.all(
+      tx.outputs.map(async (output, i) => {
+        const outputData = tx.outputsData[i];
 
-      const lock = output.lock;
-      const lockHash = lock.hash();
-      const diff = diffs.get(lockHash) ?? {
-        lock,
-        balance: ccc.Zero,
-        capacity: ccc.Zero,
-      };
+        if (!output.type || !output.type.eq(udtType)) {
+          return;
+        }
 
-      const balance = ccc.udtBalanceFrom(outputData ?? "00".repeat(16));
-      diff.balance += balance;
-      diff.capacity += output.capacity;
+        const address = await this.scriptToAddress(output.lock);
+        const diff =
+          diffs.find((d) => d.address === address) ??
+          diffs[
+            diffs.push({
+              address,
+              balance: ccc.Zero,
+              capacity: ccc.Zero,
+            }) - 1
+          ];
 
-      diffs.set(lockHash, diff);
+        const balance = ccc.udtBalanceFrom(
+          (outputData ?? "") + "00".repeat(16),
+        );
+        diff.balance += balance;
+        diff.capacity += output.capacity;
 
-      netBalance += balance;
-      netCapacity += output.capacity;
-    }
+        netBalance += balance;
+        netCapacity += output.capacity;
+      }),
+    );
 
     return {
-      diffs: Array.from(diffs.values()),
+      diffs,
       netBalance,
       netCapacity,
     };
   }
 
-  async getTokenInfoInTx(txLike: ccc.TransactionLike): Promise<{
+  async getTokenInfoInTx(tx: ccc.Transaction): Promise<{
     decimals: number | null;
     name: string | null;
     symbol: string | null;
   }> {
-    const tx = ccc.Transaction.from(txLike);
-    const uniqueType = await this.context.client.getKnownScript(
+    const uniqueType = await this.client.getKnownScript(
       ccc.KnownScript.UniqueType,
     );
 
@@ -407,5 +391,18 @@ class UdtParser {
     }
 
     return { name: null, symbol: null, decimals: null };
+  }
+
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    return parseAddress(
+      scriptLike,
+      this.client,
+      {
+        btcRequester: this.btcRequester,
+        rgbppBtcCodeHash: this.rgbppBtcCodeHash,
+        rgbppBtcHashType: this.rgbppBtcHashType,
+      },
+      this.logger,
+    );
   }
 }

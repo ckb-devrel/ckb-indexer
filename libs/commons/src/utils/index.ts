@@ -191,14 +191,10 @@ export async function parseAddress(
     rgbppBtcCodeHash: ccc.Hex;
     rgbppBtcHashType: ccc.HashType;
   },
-): Promise<{
-  address: string;
-  btc?: {
-    txId: string;
-    outIndex: number;
-  };
-}> {
+  logger?: Logger,
+): Promise<string> {
   const script = ccc.Script.from(scriptLike);
+  const ckbAddress = ccc.Address.fromScript(script, client).toString();
 
   if (
     script.codeHash === rgbpp?.rgbppBtcCodeHash &&
@@ -208,29 +204,25 @@ export async function parseAddress(
       try {
         return RgbppLockArgs.decode(script.args);
       } catch (err) {
-        throw new Error(
-          `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-        );
+        return undefined;
       }
     })();
-
-    if (decoded) {
-      const { outIndex, txId } = decoded;
-      const { data } = await rgbpp?.btcRequester.post("/", {
-        method: "getrawtransaction",
-        params: [txId.slice(2), true],
-      });
-
-      if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-        throw new Error(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
-      } else {
-        return {
-          address: data?.result?.vout?.[outIndex]?.scriptPubKey?.address,
-          btc: decoded,
-        };
-      }
+    if (!decoded) {
+      return ckbAddress;
     }
+
+    const { outIndex, txId } = decoded;
+    const { data } = await rgbpp?.btcRequester.post("/", {
+      method: "getrawtransaction",
+      params: [txId.slice(2), true],
+    });
+
+    if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+      logger?.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
+      return ckbAddress;
+    }
+    return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
   }
 
-  return { address: ccc.Address.fromScript(script, client).toString() };
+  return ckbAddress;
 }

@@ -4,19 +4,10 @@ import { ccc } from "@ckb-ccc/core";
 import { Injectable } from "@nestjs/common";
 import { EntityManager, Repository } from "typeorm";
 
-export const SYNC_KEY = "SYNCED";
-export const PENDING_KEY = "PENDING";
-
 @Injectable()
 export class SyncStatusRepo extends Repository<SyncStatus> {
   constructor(manager: EntityManager) {
     super(SyncStatus, manager);
-  }
-
-  async initialized(): Promise<boolean> {
-    const pending = await this.existsBy({ key: PENDING_KEY });
-    const sync = await this.existsBy({ key: SYNC_KEY });
-    return pending && sync;
   }
 
   async syncHeight(

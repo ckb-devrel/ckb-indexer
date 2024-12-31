@@ -20,6 +20,7 @@ export class Block {
   parentHash: string;
 
   @Column({ type: "varchar" })
+  @Index()
   height: string;
 
   @Column({ type: "int" })

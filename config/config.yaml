@@ -9,10 +9,12 @@ mysql:
 
 sync:
   interval: 10000
-  blockLimitPerInterval: 20
+  threads: 8
+  blockChunk: 100
+  blockLimitPerInterval: 50000
   blockSyncStart: 10228288
 
-  clearInterval: 120000
+  clearInterval: 1800000
   confirmations: 100
 
   rgbppBtcCodeHash: "0xd07598deec7ce7b5665310386b4abd06a6d48843e953c5cc2112ad0d5a220364"
@@ -33,6 +35,8 @@ sync:
       hashType: "type"
 
   isMainnet: false
+  maxConcurrent: 1024
+  ckbRpcTimeout: 60000
   ckbRpcUri: wss://testnet.ckb.dev/ws
   btcRpcUri: https://rpc.ankr.com/btc_signet
   decoderServerUri: http://localhost:3000

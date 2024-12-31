@@ -43,13 +43,7 @@ export class SporeService {
     });
   }
 
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<{
-    address: string;
-    btc?: {
-      txId: string;
-      outIndex: number;
-    };
-  }> {
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
     return parseAddress(scriptLike, this.client, {
       btcRequester: this.btcRequester,
       rgbppBtcCodeHash: this.rgbppBtcCodeHash,

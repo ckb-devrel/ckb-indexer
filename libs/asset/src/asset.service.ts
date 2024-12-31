@@ -48,14 +48,8 @@ export class AssetService {
     });
   }
 
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<{
-    address: string;
-    btc?: {
-      txId: string;
-      outIndex: number;
-    };
-  }> {
-    return await parseAddress(scriptLike, this.client, {
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    return parseAddress(scriptLike, this.client, {
       btcRequester: this.btcRequester,
       rgbppBtcCodeHash: this.rgbppBtcCodeHash,
       rgbppBtcHashType: this.rgbppBtcHashType,

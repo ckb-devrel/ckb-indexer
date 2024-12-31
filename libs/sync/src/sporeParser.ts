@@ -93,24 +93,17 @@ class SporeParser {
     public readonly blockHeight: ccc.Num,
   ) {}
 
-  async scriptToAddress(
-    scriptLike: ccc.ScriptLike,
-  ): Promise<{ address: string; btc?: { txId: string; outIndex: number } }> {
-    try {
-      return await parseAddress(scriptLike, this.context.client, {
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    return parseAddress(
+      scriptLike,
+      this.context.client,
+      {
         btcRequester: this.context.btcRequester,
         rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
         rgbppBtcHashType: this.context.rgbppBtcHashType,
-      });
-    } catch (error) {
-      this.context.logger.error(`Failed to parse address: ${error}`);
-      return {
-        address: ccc.Address.fromScript(
-          scriptLike,
-          this.context.client,
-        ).toString(),
-      };
-    }
+      },
+      this.context.logger,
+    );
   }
 
   async analyzeFlow(
@@ -132,7 +125,7 @@ class SporeParser {
       if (expectedMode !== mode) {
         continue;
       }
-      const { address } = await this.scriptToAddress(cellOutput.lock);
+      const address = await this.scriptToAddress(cellOutput.lock);
       const sporeOrClusterId = cellOutput.type.args;
       flows[sporeOrClusterId] = {
         asset: {
@@ -157,7 +150,7 @@ class SporeParser {
       if (expectedMode !== mode) {
         continue;
       }
-      const { address } = await this.scriptToAddress(output.lock);
+      const address = await this.scriptToAddress(output.lock);
       const sporeOrClusterId = output.type.args;
       const burnSpore = flows[sporeOrClusterId];
       if (burnSpore) {

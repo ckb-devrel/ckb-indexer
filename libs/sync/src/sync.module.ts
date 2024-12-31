@@ -6,13 +6,13 @@ import { SporeRepo } from "./repos/spore.repo";
 import { SporeParserBuilder } from "./sporeParser";
 import { SyncController } from "./sync.controller";
 import { SyncService } from "./sync.service";
-import { UdtParserBuilder } from "./udtParser";
+import { UdtParser } from "./udtParser";
 
 @Module({
   providers: [
     SyncService,
-    UdtParserBuilder,
     SporeParserBuilder,
+    UdtParser,
     BlockRepo,
     SyncStatusRepo,
     UdtBalanceRepo,
@@ -20,7 +20,7 @@ import { UdtParserBuilder } from "./udtParser";
     SporeRepo,
     ClusterRepo,
   ],
-  exports: [SyncService, UdtParserBuilder, SporeParserBuilder],
+  exports: [SyncService, UdtParser, SporeParserBuilder],
   controllers: [SyncController],
 })
 export class SyncModule {}

@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@ckb-ccc/core':
-        specifier: ^1.2.1
-        version: 1.2.1(typescript@5.7.2)
+        specifier: ^1.2.2
+        version: 1.2.2(typescript@5.7.2)
       '@ckb-ccc/spore':
-        specifier: ^1.0.5
-        version: 1.0.5(typescript@5.7.2)
+        specifier: ^1.0.7
+        version: 1.0.7(typescript@5.7.2)
       '@nestjs/common':
         specifier: ^10.0.0
         version: 10.4.15(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -324,11 +324,11 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
-  '@ckb-ccc/core@1.2.1':
-    resolution: {integrity: sha512-wU+Q7znpDtKIcZU3yC6pN1D7K2xZZiuQC4bttgtBPoCAl/EhL52iyRW4jjUPw5GeweIdvFXMSYNf6uvm3vNNEA==}
+  '@ckb-ccc/core@1.2.2':
+    resolution: {integrity: sha512-WpRsH7heZYrBYkHespOq5OWEhRlBMiBPx2JilhgMqVDKGy1i8ol3fkzPVRTrG9iYwTNYLn/9XBvi9iL4zbLQlw==}
 
-  '@ckb-ccc/spore@1.0.5':
-    resolution: {integrity: sha512-nsTGWbppERP1XfZ2t5cb3QcSrfeCXq6TYuSLN9iMPxItS3GbWqHeDHLgpIoHC3FQR4gBcteI/VPWhjhQXu2Jvg==}
+  '@ckb-ccc/spore@1.0.7':
+    resolution: {integrity: sha512-xiiQ1Y0srxtyhoXHMvPvU3UksfrCT1MPSLuxfrU9UHNfr9L5d3yQuQUsgszwUiQc4nFlULC66tTY2ULV2LIOeQ==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -3553,7 +3553,7 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
-  '@ckb-ccc/core@1.2.1(typescript@5.7.2)':
+  '@ckb-ccc/core@1.2.2(typescript@5.7.2)':
     dependencies:
       '@joyid/ckb': 1.1.0(typescript@5.7.2)
       '@noble/ciphers': 0.5.3
@@ -3575,9 +3575,9 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@ckb-ccc/spore@1.0.5(typescript@5.7.2)':
+  '@ckb-ccc/spore@1.0.7(typescript@5.7.2)':
     dependencies:
-      '@ckb-ccc/core': 1.2.1(typescript@5.7.2)
+      '@ckb-ccc/core': 1.2.2(typescript@5.7.2)
       axios: 1.7.9
     transitivePeerDependencies:
       - bufferutil

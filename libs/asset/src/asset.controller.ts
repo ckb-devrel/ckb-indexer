@@ -2,6 +2,7 @@ import {
   assert,
   AssetTxData,
   asyncMap,
+  RgbppLockArgs,
   RpcError,
   TokenCell,
   TxAssetCellData,
@@ -22,9 +23,14 @@ export class AssetController {
     };
   }): Promise<TokenCell> {
     const { cell, spender } = params;
-    const { address, btc } = await this.service.scriptToAddress(
-      cell.cellOutput.lock,
-    );
+    const address = await this.service.scriptToAddress(cell.cellOutput.lock);
+    const btc = (() => {
+      try {
+        return RgbppLockArgs.decode(cell.cellOutput.lock.args);
+      } catch (err) {
+        return undefined;
+      }
+    })();
     const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     return {
       txId: cell.outPoint.txHash,

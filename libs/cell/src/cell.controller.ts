@@ -1,4 +1,10 @@
-import { assert, asyncMap, RpcError, TokenCell } from "@app/commons";
+import {
+  assert,
+  asyncMap,
+  RgbppLockArgs,
+  RpcError,
+  TokenCell,
+} from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get } from "@nestjs/common";
 import { CellService } from "./cell.service";
@@ -11,9 +17,14 @@ export class CellController {
     cell: ccc.Cell,
     spenderTx?: ccc.Hex,
   ): Promise<TokenCell> {
-    const { address, btc } = await this.service.scriptToAddress(
-      cell.cellOutput.lock,
-    );
+    const address = await this.service.scriptToAddress(cell.cellOutput.lock);
+    const btc = (() => {
+      try {
+        return RgbppLockArgs.decode(cell.cellOutput.lock.args);
+      } catch (err) {
+        return undefined;
+      }
+    })();
     const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     return {
       txId: cell.outPoint.txHash,
