@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ckb-ccc/core':
-        specifier: ^1.0.1
-        version: 1.0.1(typescript@5.7.2)
+        specifier: ^1.2.1
+        version: 1.2.1(typescript@5.7.2)
       '@nestjs/common':
         specifier: ^10.0.0
         version: 10.4.15(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -321,8 +321,8 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
-  '@ckb-ccc/core@1.0.1':
-    resolution: {integrity: sha512-NPWk/KdpvJSuA055IporNd2TjNhiRmSVQosjJKW8dpWI05BgsBcq/4jMQVSSmbpRtnOAP2SxcGWQYhDbBb3EqQ==}
+  '@ckb-ccc/core@1.2.1':
+    resolution: {integrity: sha512-wU+Q7znpDtKIcZU3yC6pN1D7K2xZZiuQC4bttgtBPoCAl/EhL52iyRW4jjUPw5GeweIdvFXMSYNf6uvm3vNNEA==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -3547,7 +3547,7 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
-  '@ckb-ccc/core@1.0.1(typescript@5.7.2)':
+  '@ckb-ccc/core@1.2.1(typescript@5.7.2)':
     dependencies:
       '@joyid/ckb': 1.1.0(typescript@5.7.2)
       '@noble/ciphers': 0.5.3

@@ -21,6 +21,17 @@ sync:
   rgbppBtcTimelockCodeHash: ""
   rgbppBtcTimelockHashType: "type"
 
+  udtTypes:
+    # sUDT
+    - codeHash: "0x48dbf59b4c7ee1547238021b4869bceedf4eea6b43772e5d66ef8865b6ae7212"
+      hashType: "data"
+    # xUDT
+    - codeHash: "0x50bd8d6680b8b9cf98b73f3c08faf8b2a21914311954118ad6609be6e78a1b95"
+      hashType: "data1"
+    # xUDT(final_rls)
+    - codeHash: "0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb"
+      hashType: "type"
+
   isMainnet: false
   ckbRpcUri: wss://testnet.ckb.dev/ws
   btcRpcUri: https://rpc.ankr.com/btc_signet

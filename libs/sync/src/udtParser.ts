@@ -19,6 +19,8 @@ export class UdtParserBuilder {
   public readonly btcRequester: Axios;
   public readonly client: ccc.Client;
 
+  public readonly udtTypes: ccc.Script[];
+
   public readonly rgbppBtcCodeHash: ccc.Hex;
   public readonly rgbppBtcHashType: ccc.HashType;
 
@@ -41,6 +43,12 @@ export class UdtParserBuilder {
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
+
+    const udtTypes =
+      configService.get<
+        { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
+      >("sync.udtTypes") ?? [];
+    this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
   }
 
   build(blockHeight: ccc.NumLike): UdtParser {
@@ -266,12 +274,11 @@ class UdtParser {
   async isTypeUdt(scriptLike: ccc.ScriptLike): Promise<boolean> {
     const script = ccc.Script.from(scriptLike);
 
-    const xUDTScript = await this.context.client.getKnownScript(
-      ccc.KnownScript.XUdt,
-    );
     if (
-      script.codeHash === xUDTScript.codeHash &&
-      script.hashType === xUDTScript.hashType
+      this.context.udtTypes.some(
+        ({ codeHash, hashType }) =>
+          script.codeHash === codeHash && script.hashType === hashType,
+      )
     ) {
       return true;
     }
