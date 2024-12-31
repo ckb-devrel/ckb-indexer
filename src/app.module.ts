@@ -3,6 +3,8 @@ import { SchemasModule } from "@app/schemas";
 import { SyncModule } from "@app/sync";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { AgentModule } from "libs/agent/src";
+import { XudtModule } from "libs/xudt/src";
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { ConfigModule } from "@nestjs/config";
     }),
     SchemasModule,
     SyncModule,
+    AgentModule,
+    XudtModule
   ],
 })
 export class AppModule {}
