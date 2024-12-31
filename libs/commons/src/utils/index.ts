@@ -1,3 +1,4 @@
+import { ccc } from "@ckb-ccc/core";
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -87,3 +88,12 @@ export function assert<T>(
 export function assertConfig<T>(config: ConfigService, key: string): T {
   return assert(config.get<T>(key), `Missing config: ${key}`);
 }
+
+export const RgbppLockArgs = ccc.mol.struct({
+  outIndex: ccc.mol.Uint32,
+  // No idea why the txId is reversed
+  txId: ccc.mol.Byte32.map({
+    inMap: (v: ccc.HexLike) => ccc.bytesFrom(v).reverse(),
+    outMap: (v) => ccc.hexFrom(ccc.bytesFrom(v).reverse()),
+  }),
+});

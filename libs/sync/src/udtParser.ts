@@ -1,21 +1,22 @@
 import {
+  assertConfig,
   formatSortable,
   formatSortableInt,
   parseSortableInt,
+  RgbppLockArgs,
   withTransaction,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Axios } from "axios";
+import axios, { Axios } from "axios";
 import { EntityManager } from "typeorm";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
-import { SyncAgent } from "./sync.agent";
 
 @Injectable()
 export class UdtParserBuilder {
   public readonly logger = new Logger(UdtParserBuilder.name);
-  public readonly requester: Axios;
+  public readonly btcRequester: Axios;
   public readonly client: ccc.Client;
 
   public readonly rgbppBtcCodeHash: ccc.Hex;
@@ -24,21 +25,22 @@ export class UdtParserBuilder {
   constructor(
     configService: ConfigService,
     public readonly entityManager: EntityManager,
-    public readonly syncAgent: SyncAgent,
   ) {
-    this.client = syncAgent.rpc();
+    const isMainnet = configService.get<boolean>("sync.isMainnet");
+    const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
+    this.client = isMainnet
+      ? new ccc.ClientPublicMainnet({ url: ckbRpcUri })
+      : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
 
-    const btcCodeHash = configService.get<string>("sync.rgbppBtcCodeHash");
-    if (!btcCodeHash) {
-      throw Error("Missing sync.rgbppBtcCodeHash");
-    }
-    this.rgbppBtcCodeHash = ccc.hexFrom(btcCodeHash);
-
-    const btcHashType = configService.get<string>("sync.rgbppBtcHashType");
-    if (!btcHashType) {
-      throw Error("Missing sync.rgbppBtcHashType");
-    }
-    this.rgbppBtcHashType = ccc.hashTypeFrom(btcHashType);
+    this.btcRequester = axios.create({
+      baseURL: assertConfig(configService, "sync.btcRpcUri"),
+    });
+    this.rgbppBtcCodeHash = ccc.hexFrom(
+      assertConfig(configService, "sync.rgbppBtcCodeHash"),
+    );
+    this.rgbppBtcHashType = ccc.hashTypeFrom(
+      assertConfig(configService, "sync.rgbppBtcHashType"),
+    );
   }
 
   build(blockHeight: ccc.NumLike): UdtParser {
@@ -51,6 +53,43 @@ class UdtParser {
     public readonly context: UdtParserBuilder,
     public readonly blockHeight: ccc.Num,
   ) {}
+
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    const script = ccc.Script.from(scriptLike);
+
+    if (
+      script.codeHash === this.context.rgbppBtcCodeHash &&
+      script.hashType === this.context.rgbppBtcHashType
+    ) {
+      const decoded = (() => {
+        try {
+          return RgbppLockArgs.decode(script.args);
+        } catch (err) {
+          this.context.logger.warn(
+            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
+          );
+        }
+      })();
+
+      if (decoded) {
+        const { outIndex, txId } = decoded;
+        const { data } = await this.context.btcRequester.post("/", {
+          method: "getrawtransaction",
+          params: [txId.slice(2), true],
+        });
+
+        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+          this.context.logger.warn(
+            `Failed to get btc rgbpp utxo ${txId}:${outIndex}`,
+          );
+        } else {
+          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
+        }
+      }
+    }
+
+    return ccc.Address.fromScript(script, this.context.client).toString();
+  }
 
   async udtInfoHandleTx(
     entityManager: EntityManager,
@@ -144,9 +183,7 @@ class UdtParser {
           /* === Update UDT Balance === */
           await Promise.all(
             diffs.map(async (diff) => {
-              const { address } = await this.context.syncAgent.scriptToAddress(
-                diff.lock,
-              );
+              const address = await this.scriptToAddress(diff.lock);
               const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
 
               const existedUdtBalance = await udtBalanceRepo.findOne({

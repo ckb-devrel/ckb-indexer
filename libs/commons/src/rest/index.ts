@@ -1,9 +1,16 @@
 import { ccc } from "@ckb-ccc/core";
-import { ScriptMode } from "../sync.agent";
 
 export enum Chain {
   Ckb = "ckb",
   Btc = "btc",
+}
+
+export enum ScriptMode {
+  Rgbpp,
+  SingleUseLock,
+  Xudt,
+  Spore,
+  Unknown,
 }
 
 export interface CellScript {

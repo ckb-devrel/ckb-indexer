@@ -4,6 +4,7 @@ import {
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
+import { BlockWrap } from "@app/commons/rest/warpper";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -41,6 +42,7 @@ export class SyncService {
     private readonly syncStatusRepo: SyncStatusRepo,
     private readonly udtInfoRepo: UdtInfoRepo,
     private readonly udtBalanceRepo: UdtBalanceRepo,
+    private readonly blockRepo: BlockRepo,
   ) {
     this.client = new ccc.ClientPublicTestnet();
 
@@ -235,5 +237,27 @@ export class SyncService {
     this.logger.log(
       `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance`,
     );
+  }
+
+  async getBlockHeader(params: {
+    blockNumber?: number;
+    fromDb: boolean;
+  }): Promise<BlockWrap | undefined> {
+    const { blockNumber, fromDb } = params;
+    if (blockNumber) {
+      if (fromDb) {
+        return BlockWrap.from(
+          await this.blockRepo.getBlockByNumber(ccc.numFrom(blockNumber)),
+        );
+      } else {
+        return BlockWrap.from(await this.client.getHeaderByNumber(blockNumber));
+      }
+    } else {
+      if (fromDb) {
+        return BlockWrap.from(await this.blockRepo.getTipBlock());
+      } else {
+        return BlockWrap.from(await this.client.getTipHeader());
+      }
+    }
   }
 }

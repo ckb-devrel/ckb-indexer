@@ -1,10 +1,9 @@
-import { assertConfig, parseSortableInt } from "@app/commons";
-import { Block, UdtBalance, UdtInfo } from "@app/schemas";
+import { assertConfig, parseSortableInt, RgbppLockArgs } from "@app/commons";
+import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { Axios } from "axios";
-import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 import { BlockRepo } from "./repos/block.repo";
 
 export class AgentBlock {
@@ -42,15 +41,6 @@ export class AgentBlock {
   }
 }
 
-const RgbppLockArgs = ccc.mol.struct({
-  outIndex: ccc.mol.Uint32,
-  // No idea why the txId is reversed
-  txId: ccc.mol.Byte32.map({
-    inMap: (v: ccc.HexLike) => ccc.bytesFrom(v).reverse(),
-    outMap: (v) => ccc.hexFrom(ccc.bytesFrom(v).reverse()),
-  }),
-});
-
 export enum ScriptMode {
   Rgbpp,
   SingleUseLock,
@@ -60,8 +50,8 @@ export enum ScriptMode {
 }
 
 @Injectable()
-export class SyncAgent {
-  private readonly logger = new Logger(SyncAgent.name);
+export class AgentService {
+  private readonly logger = new Logger(AgentService.name);
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
@@ -69,8 +59,6 @@ export class SyncAgent {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly udtInfoRepo: UdtInfoRepo,
-    private readonly udtBalanceRepo: UdtBalanceRepo,
     private readonly blockRepo: BlockRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
@@ -90,81 +78,6 @@ export class SyncAgent {
     this.btcRequester = axios.create({
       baseURL: btcRpcUri,
     });
-  }
-
-  rpc(): ccc.Client {
-    return this.client;
-  }
-
-  async getTokenInfo(
-    tokenId: ccc.HexLike,
-    withTxAndBlock: boolean = false,
-  ): Promise<{
-    udtInfo: UdtInfo;
-    tx?: ccc.Transaction;
-    block?: AgentBlock;
-  } | null> {
-    const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
-    if (!udtInfo) {
-      return null;
-    }
-    if (withTxAndBlock) {
-      const issueTx = await this.client.getTransaction(
-        udtInfo.firstIssuanceTxHash,
-      );
-      if (!issueTx) {
-        return { udtInfo };
-      }
-      const issueBlock = await this.blockRepo.getBlockByHashOrNumber({
-        hash: issueTx.blockHash,
-        number: issueTx.blockNumber,
-      });
-      if (!issueBlock) {
-        if (issueTx.blockHash) {
-          const header = await this.client.getHeaderByHash(issueTx.blockHash);
-          return {
-            udtInfo,
-            tx: issueTx.transaction,
-            block: AgentBlock.from(header),
-          };
-        } else if (issueTx.blockNumber) {
-          const header = await this.client.getHeaderByNumber(
-            issueTx.blockNumber,
-          );
-          return {
-            udtInfo,
-            tx: issueTx.transaction,
-            block: AgentBlock.from(header),
-          };
-        } else {
-          throw new Error(
-            "issueTx.blockHash or issueTx.blockNumber should be provided",
-          );
-        }
-      }
-      return {
-        udtInfo,
-        tx: issueTx.transaction,
-        block: AgentBlock.from(issueBlock),
-      };
-    } else {
-      return { udtInfo };
-    }
-  }
-
-  async getTokenHoldersCount(tokenId: ccc.HexLike): Promise<number> {
-    return this.udtBalanceRepo.countBy({ tokenHash: ccc.hexFrom(tokenId) });
-  }
-
-  async getTokenBalance(
-    address: string,
-    tokenId?: ccc.HexLike,
-  ): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenByAddress(address, tokenId);
-  }
-
-  async getTokenAllBalances(tokenId: ccc.HexLike): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenByTokenId(tokenId);
   }
 
   async parseScriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
