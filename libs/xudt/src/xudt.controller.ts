@@ -3,6 +3,7 @@ import {
   asyncMap,
   asyncSome,
   Chain,
+  parseSortableInt,
   RpcError,
   ScriptMode,
   TokenBalance,
@@ -69,7 +70,7 @@ export class XudtController {
       rgbppTag: rgbppIssue,
       issueChain: rgbppIssue ? Chain.Btc : Chain.Ckb,
       issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),
-      issueTxHeight: issueBlock.height,
+      issueTxHeight: parseSortableInt(issueBlock.height),
       issueTime: issueBlock.timestamp,
     };
   }

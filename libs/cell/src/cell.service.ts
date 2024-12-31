@@ -4,7 +4,6 @@ import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { Axios } from "axios";
-import { BlockRepo } from "./repos/block.repo";
 
 export class AgentBlock {
   constructor(
@@ -50,17 +49,14 @@ export enum ScriptMode {
 }
 
 @Injectable()
-export class AgentService {
-  private readonly logger = new Logger(AgentService.name);
+export class CellService {
+  private readonly logger = new Logger(CellService.name);
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
   private readonly btcRequester: Axios;
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly blockRepo: BlockRepo,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
     this.client = isMainnet
@@ -233,29 +229,5 @@ export class AgentService {
       }
     }
     return spentCell ? { cell: spentCell, spentTx } : undefined;
-  }
-
-  async getBlockHeader(params: {
-    blockNumber?: number;
-    fromDb: boolean;
-  }): Promise<AgentBlock | undefined> {
-    const { blockNumber, fromDb } = params;
-    if (blockNumber) {
-      if (fromDb) {
-        return AgentBlock.from(
-          await this.blockRepo.getBlockByNumber(ccc.numFrom(blockNumber)),
-        );
-      } else {
-        return AgentBlock.from(
-          await this.client.getHeaderByNumber(blockNumber),
-        );
-      }
-    } else {
-      if (fromDb) {
-        return AgentBlock.from(await this.blockRepo.getTipBlock());
-      } else {
-        return AgentBlock.from(await this.client.getTipHeader());
-      }
-    }
   }
 }

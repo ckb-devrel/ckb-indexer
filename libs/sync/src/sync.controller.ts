@@ -1,4 +1,5 @@
-import { assert, RpcError, TrackerInfo } from "@app/commons";
+import { assert, parseSortableInt, RpcError, TrackerInfo } from "@app/commons";
+import { ccc } from "@ckb-ccc/core";
 import { Controller, Get } from "@nestjs/common";
 import { SyncService } from "./sync.service";
 
@@ -21,10 +22,10 @@ export class SyncController {
       RpcError.BlockNotFound,
     );
     return {
-      trackerBlockHeight: dbTip.height,
-      trackerBestBlockHash: dbTip.hash,
-      nodeBlockHeight: nodeTip.height,
-      nodeBestBlockHash: nodeTip.hash,
+      trackerBlockHeight: parseSortableInt(dbTip.height),
+      trackerBestBlockHash: ccc.hexFrom(dbTip.hash),
+      nodeBlockHeight: parseSortableInt(nodeTip.height),
+      nodeBestBlockHash: ccc.hexFrom(nodeTip.hash),
     };
   }
 }

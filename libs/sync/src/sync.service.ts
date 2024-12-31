@@ -1,10 +1,11 @@
 import {
   autoRun,
   formatSortableInt,
+  headerToRepoBlock,
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
-import { BlockWrap } from "@app/commons/rest/warpper";
+import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -242,21 +243,21 @@ export class SyncService {
   async getBlockHeader(params: {
     blockNumber?: number;
     fromDb: boolean;
-  }): Promise<BlockWrap | undefined> {
+  }): Promise<Block | undefined> {
     const { blockNumber, fromDb } = params;
     if (blockNumber) {
       if (fromDb) {
-        return BlockWrap.from(
-          await this.blockRepo.getBlockByNumber(ccc.numFrom(blockNumber)),
-        );
+        return await this.blockRepo.getBlockByNumber(ccc.numFrom(blockNumber));
       } else {
-        return BlockWrap.from(await this.client.getHeaderByNumber(blockNumber));
+        const header = await this.client.getHeaderByNumber(blockNumber);
+        return headerToRepoBlock(header);
       }
     } else {
       if (fromDb) {
-        return BlockWrap.from(await this.blockRepo.getTipBlock());
+        return await this.blockRepo.getTipBlock();
       } else {
-        return BlockWrap.from(await this.client.getTipHeader());
+        const header = await this.client.getTipHeader();
+        return headerToRepoBlock(header);
       }
     }
   }

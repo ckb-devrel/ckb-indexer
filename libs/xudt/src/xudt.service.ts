@@ -1,6 +1,5 @@
-import { assertConfig, ScriptMode } from "@app/commons";
-import { BlockWrap } from "@app/commons/rest/warpper";
-import { UdtBalance, UdtInfo } from "@app/schemas";
+import { assertConfig, headerToRepoBlock, ScriptMode } from "@app/commons";
+import { Block, UdtBalance, UdtInfo } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -39,7 +38,7 @@ export class XudtService {
   ): Promise<{
     udtInfo: UdtInfo;
     tx?: ccc.Transaction;
-    block?: BlockWrap;
+    block?: Block;
   } | null> {
     const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
     if (!udtInfo) {
@@ -62,7 +61,7 @@ export class XudtService {
           return {
             udtInfo,
             tx: issueTx.transaction,
-            block: BlockWrap.from(header),
+            block: headerToRepoBlock(header),
           };
         } else if (issueTx.blockNumber) {
           const header = await this.client.getHeaderByNumber(
@@ -71,7 +70,7 @@ export class XudtService {
           return {
             udtInfo,
             tx: issueTx.transaction,
-            block: BlockWrap.from(header),
+            block: headerToRepoBlock(header),
           };
         } else {
           throw new Error(
@@ -82,7 +81,7 @@ export class XudtService {
       return {
         udtInfo,
         tx: issueTx.transaction,
-        block: BlockWrap.from(issueBlock),
+        block: issueBlock,
       };
     } else {
       return { udtInfo };

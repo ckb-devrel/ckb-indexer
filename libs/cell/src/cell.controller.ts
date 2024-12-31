@@ -1,11 +1,11 @@
-import { assert, BlockHeader, RpcError, TokenCell } from "@app/commons";
+import { assert, RpcError, TokenCell } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get } from "@nestjs/common";
-import { AgentService } from "./agent.service";
+import { CellService } from "./cell.service";
 
 @Controller()
-export class AgentController {
-  constructor(private readonly service: AgentService) {}
+export class CellController {
+  constructor(private readonly service: CellService) {}
 
   async cellToTokenCell(
     cell: ccc.Cell,
@@ -43,35 +43,6 @@ export class AgentController {
     );
     assert(cell.cellOutput.type, RpcError.CellNotAsset);
     return await this.cellToTokenCell(cell, spentTx);
-  }
-
-  @Get("/getLatestBlock")
-  async getLatestBlock(): Promise<BlockHeader> {
-    const tipHeader = assert(
-      await this.service.getBlockHeader({
-        fromDb: false,
-      }),
-      RpcError.BlockNotFound,
-    );
-    return {
-      preHash: tipHeader.parentHash,
-      ...tipHeader,
-    };
-  }
-
-  @Get("/getBlockHeaderByNumber")
-  async getBlockHeaderByNumber(blockNumber: number): Promise<BlockHeader> {
-    const blockHeader = assert(
-      await this.service.getBlockHeader({
-        blockNumber,
-        fromDb: false,
-      }),
-      RpcError.BlockNotFound,
-    );
-    return {
-      preHash: blockHeader.parentHash,
-      ...blockHeader,
-    };
   }
 
   @Get("/getIsomorphicCellByUtxo")

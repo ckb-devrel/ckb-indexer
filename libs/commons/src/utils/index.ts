@@ -1,6 +1,8 @@
+import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { formatSortableInt } from "../ormUtils";
 
 export function sleep(time: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, time));
@@ -97,3 +99,16 @@ export const RgbppLockArgs = ccc.mol.struct({
     outMap: (v) => ccc.hexFrom(ccc.bytesFrom(v).reverse()),
   }),
 });
+
+export function headerToRepoBlock(
+  header: ccc.ClientBlockHeader | undefined,
+): Block | undefined {
+  if (!header) {
+    return header;
+  }
+  const block = new Block();
+  block.hash = header.hash;
+  block.height = formatSortableInt(header.number);
+  block.parentHash = header.parentHash;
+  return block;
+}
