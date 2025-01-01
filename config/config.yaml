@@ -10,11 +10,7 @@ mysql:
 sync:
   interval: 10000
   blockLimitPerInterval: 20
-<<<<<<< HEAD
   blockSyncStart: 15742000
-=======
-  blockSyncStart: 0
->>>>>>> c92dbd5 (feat(WIP): add controller module)
 
   clearInterval: 120000
   confirmations: 100
