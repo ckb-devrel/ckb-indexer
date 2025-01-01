@@ -25,14 +25,12 @@ async function bootstrap() {
     credentials: true,
   });
   const swaggerConfig = new DocumentBuilder()
-    .setTitle("Cats example")
-    .setDescription("The cats API description")
-    .setVersion("1.0")
-    .addTag("cats")
+    .setTitle("CKB Indexer API")
+    .setDescription("The CKB Indexer API description")
+    .setVersion("0.0.1")
     .build();
-  const documentFactory = () =>
-    SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup("api", app, documentFactory);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup("docs", app, document);
 
   await app.listen(config.port, () =>
     Logger.log(`listening on ${config.port}`),
