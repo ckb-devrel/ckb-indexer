@@ -1,4 +1,8 @@
+import { Block } from "@app/schemas";
+import { ccc } from "@ckb-ccc/core";
 import { Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { formatSortableInt } from "../ormUtils";
 
 export function sleep(time: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, time));
@@ -30,4 +34,81 @@ export function autoRun(
       }
     })();
   }
+}
+
+export async function asyncSome<T>(
+  arr: T[],
+  predicate: (item: T) => Promise<boolean>,
+) {
+  for (const item of arr) {
+    if (await predicate(item)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export async function asyncMap<T, R>(
+  arr: T[],
+  mapper: (item: T) => Promise<R>,
+) {
+  return Promise.all(arr.map(mapper));
+}
+
+export enum RpcError {
+  TokenNotFound,
+  TxNotFound,
+  BlockNotFound,
+  CkbCellNotFound,
+  RgbppCellNotFound,
+  CellNotAsset,
+}
+
+export const RpcErrorMessage: Record<RpcError, string> = {
+  [RpcError.TokenNotFound]: "Token not found",
+  [RpcError.TxNotFound]: "Tx not found",
+  [RpcError.BlockNotFound]: "Block not found",
+  [RpcError.CkbCellNotFound]: "Cell on ckb not found",
+  [RpcError.RgbppCellNotFound]: "Rgbpp cell on ckb not found",
+  [RpcError.CellNotAsset]: "Cell is not an asset",
+};
+
+export function assert<T>(
+  expression: T | undefined | null,
+  message: string | RpcError,
+): T {
+  if (!expression) {
+    if (typeof message === "string") {
+      throw new Error(message);
+    } else {
+      throw new Error(RpcErrorMessage[message]);
+    }
+  }
+  return expression;
+}
+
+export function assertConfig<T>(config: ConfigService, key: string): T {
+  return assert(config.get<T>(key), `Missing config: ${key}`);
+}
+
+export const RgbppLockArgs = ccc.mol.struct({
+  outIndex: ccc.mol.Uint32,
+  // No idea why the txId is reversed
+  txId: ccc.mol.Byte32.map({
+    inMap: (v: ccc.HexLike) => ccc.bytesFrom(v).reverse(),
+    outMap: (v) => ccc.hexFrom(ccc.bytesFrom(v).reverse()),
+  }),
+});
+
+export function headerToRepoBlock(
+  header: ccc.ClientBlockHeader | undefined,
+): Block | undefined {
+  if (!header) {
+    return header;
+  }
+  const block = new Block();
+  block.hash = header.hash;
+  block.height = formatSortableInt(header.number);
+  block.parentHash = header.parentHash;
+  return block;
 }

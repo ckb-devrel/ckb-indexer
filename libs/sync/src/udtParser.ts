@@ -1,7 +1,9 @@
 import {
+  assertConfig,
   formatSortable,
   formatSortableInt,
   parseSortableInt,
+  RgbppLockArgs,
   withTransaction,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
@@ -14,9 +16,8 @@ import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 @Injectable()
 export class UdtParserBuilder {
   public readonly logger = new Logger(UdtParserBuilder.name);
-  public readonly requester: Axios;
-  public readonly client: ccc.Client;
   public readonly btcRequester: Axios;
+  public readonly client: ccc.Client;
 
   public readonly rgbppBtcCodeHash: ccc.Hex;
   public readonly rgbppBtcHashType: ccc.HashType;
@@ -31,25 +32,15 @@ export class UdtParserBuilder {
       ? new ccc.ClientPublicMainnet({ url: ckbRpcUri })
       : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
 
-    const btcRpcUri = configService.get<string>("sync.btcRpcUri");
-    if (!btcRpcUri) {
-      throw Error("Missing sync.btcRpcUri");
-    }
     this.btcRequester = axios.create({
-      baseURL: btcRpcUri,
+      baseURL: assertConfig(configService, "sync.btcRpcUri"),
     });
-
-    const btcCodeHash = configService.get<string>("sync.rgbppBtcCodeHash");
-    if (!btcCodeHash) {
-      throw Error("Missing sync.rgbppBtcCodeHash");
-    }
-    this.rgbppBtcCodeHash = ccc.hexFrom(btcCodeHash);
-
-    const btcHashType = configService.get<string>("sync.rgbppBtcHashType");
-    if (!btcHashType) {
-      throw Error("Missing sync.rgbppBtcHashType");
-    }
-    this.rgbppBtcHashType = ccc.hashTypeFrom(btcHashType);
+    this.rgbppBtcCodeHash = ccc.hexFrom(
+      assertConfig(configService, "sync.rgbppBtcCodeHash"),
+    );
+    this.rgbppBtcHashType = ccc.hashTypeFrom(
+      assertConfig(configService, "sync.rgbppBtcHashType"),
+    );
   }
 
   build(blockHeight: ccc.NumLike): UdtParser {
@@ -57,11 +48,48 @@ export class UdtParserBuilder {
   }
 }
 
-export class UdtParser {
+class UdtParser {
   constructor(
     public readonly context: UdtParserBuilder,
     public readonly blockHeight: ccc.Num,
   ) {}
+
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    const script = ccc.Script.from(scriptLike);
+
+    if (
+      script.codeHash === this.context.rgbppBtcCodeHash &&
+      script.hashType === this.context.rgbppBtcHashType
+    ) {
+      const decoded = (() => {
+        try {
+          return RgbppLockArgs.decode(script.args);
+        } catch (err) {
+          this.context.logger.warn(
+            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
+          );
+        }
+      })();
+
+      if (decoded) {
+        const { outIndex, txId } = decoded;
+        const { data } = await this.context.btcRequester.post("/", {
+          method: "getrawtransaction",
+          params: [txId.slice(2), true],
+        });
+
+        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+          this.context.logger.warn(
+            `Failed to get btc rgbpp utxo ${txId}:${outIndex}`,
+          );
+        } else {
+          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
+        }
+      }
+    }
+
+    return ccc.Address.fromScript(script, this.context.client).toString();
+  }
 
   async udtInfoHandleTx(
     entityManager: EntityManager,
@@ -390,50 +418,4 @@ export class UdtParser {
 
     return { name: null, symbol: null, decimals: null };
   }
-
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    const script = ccc.Script.from(scriptLike);
-
-    if (
-      script.codeHash === this.context.rgbppBtcCodeHash &&
-      script.hashType === this.context.rgbppBtcHashType
-    ) {
-      const decoded = (() => {
-        try {
-          return RgbppLockArgs.decode(script.args);
-        } catch (err) {
-          this.context.logger.warn(
-            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-          );
-        }
-      })();
-
-      if (decoded) {
-        const { outIndex, txId } = decoded;
-        const { data } = await this.context.btcRequester.post("/", {
-          method: "getrawtransaction",
-          params: [txId.slice(2), true],
-        });
-
-        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-          this.context.logger.warn(
-            `Failed to get btc rgbpp utxo ${txId}:${outIndex}`,
-          );
-        } else {
-          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
-        }
-      }
-    }
-
-    return ccc.Address.fromScript(script, this.context.client).toString();
-  }
 }
-
-const RgbppLockArgs = ccc.mol.struct({
-  outIndex: ccc.mol.Uint32,
-  // No idea why the txId is reversed
-  txId: ccc.mol.Byte32.map({
-    inMap: (v: ccc.HexLike) => ccc.bytesFrom(v).reverse(),
-    outMap: (v) => ccc.hexFrom(ccc.bytesFrom(v).reverse()),
-  }),
-});

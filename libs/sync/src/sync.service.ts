@@ -1,9 +1,11 @@
 import {
   autoRun,
   formatSortableInt,
+  headerToRepoBlock,
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
+import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -26,6 +28,7 @@ export class SyncService {
   private readonly logger = new Logger(SyncService.name);
   private readonly client: ccc.Client;
   private readonly blockLimitPerInterval: number | undefined;
+  private readonly blockSyncStart: number | undefined;
   private readonly confirmations: number | undefined;
 
   private startTip?: ccc.Num;
@@ -40,12 +43,14 @@ export class SyncService {
     private readonly syncStatusRepo: SyncStatusRepo,
     private readonly udtInfoRepo: UdtInfoRepo,
     private readonly udtBalanceRepo: UdtBalanceRepo,
+    private readonly blockRepo: BlockRepo,
   ) {
     this.client = new ccc.ClientPublicTestnet();
 
     this.blockLimitPerInterval = configService.get<number>(
       "sync.blockLimitPerInterval",
     );
+    this.blockSyncStart = configService.get<number>("sync.blockSyncStart");
     this.confirmations = configService.get<number>("sync.confirmations");
 
     const syncInterval = configService.get<number>("sync.interval");
@@ -60,8 +65,7 @@ export class SyncService {
   }
 
   async sync() {
-    const pendingStatus =
-      await this.syncStatusRepo.assertSyncHeight(PENDING_KEY);
+    const pendingStatus = await this.syncStatusRepo.syncHeight(PENDING_KEY, this.blockSyncStart);
     const pendingHeight = parseSortableInt(pendingStatus.value);
 
     const tip = await this.client.getTip();
@@ -106,6 +110,7 @@ export class SyncService {
             hash: block.header.hash,
             parentHash: block.header.parentHash,
             height: formatSortableInt(block.header.number),
+            timestamp: Number(block.header.timestamp / 1000n),
           });
 
           for (const tx of block.transactions) {
@@ -133,6 +138,9 @@ export class SyncService {
 
   async clear() {
     if (this.confirmations === undefined) {
+      return;
+    }
+    if (!await this.syncStatusRepo.initialized()) {
       return;
     }
 
@@ -230,5 +238,27 @@ export class SyncService {
     this.logger.log(
       `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance`,
     );
+  }
+
+  async getBlockHeader(params: {
+    blockNumber?: number;
+    fromDb: boolean;
+  }): Promise<Block | undefined> {
+    const { blockNumber, fromDb } = params;
+    if (blockNumber) {
+      if (fromDb) {
+        return await this.blockRepo.getBlockByNumber(ccc.numFrom(blockNumber));
+      } else {
+        const header = await this.client.getHeaderByNumber(blockNumber);
+        return headerToRepoBlock(header);
+      }
+    } else {
+      if (fromDb) {
+        return await this.blockRepo.getTipBlock();
+      } else {
+        const header = await this.client.getTipHeader();
+        return headerToRepoBlock(header);
+      }
+    }
   }
 }

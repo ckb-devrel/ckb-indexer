@@ -10,13 +10,13 @@ export class BlockRepo extends Repository<Block> {
     super(Block, manager);
   }
 
-  async getBlockByHash(hash: ccc.Hex): Promise<Block | undefined> {
-    return (await this.findOneBy({ hash })) ?? undefined;
+  async getBlockByHash(hash: ccc.Hex): Promise<Block | null> {
+    return await this.findOneBy({ hash });
   }
 
-  async getBlockByNumber(number: ccc.Num): Promise<Block | undefined> {
+  async getBlockByNumber(number: ccc.Num): Promise<Block | null> {
     const height = formatSortableInt(number);
-    return (await this.findOneBy({ height })) ?? undefined;
+    return await this.findOneBy({ height });
   }
 
   async getTipBlock(): Promise<Block | undefined> {
@@ -30,7 +30,7 @@ export class BlockRepo extends Repository<Block> {
   async getBlockByHashOrNumber(params: {
     hash?: ccc.Hex;
     number?: ccc.Num;
-  }): Promise<Block | undefined> {
+  }): Promise<Block | null> {
     const { hash, number } = params;
     if (hash) {
       return await this.getBlockByHash(hash);
