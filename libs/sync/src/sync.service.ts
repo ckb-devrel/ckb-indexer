@@ -65,10 +65,7 @@ export class SyncService {
   }
 
   async sync() {
-    const pendingStatus = await this.syncStatusRepo.syncHeight(
-      PENDING_KEY,
-      this.blockSyncStart,
-    );
+    const pendingStatus = await this.syncStatusRepo.syncHeight(PENDING_KEY, this.blockSyncStart);
     const pendingHeight = parseSortableInt(pendingStatus.value);
 
     const tip = await this.client.getTip();
@@ -113,7 +110,7 @@ export class SyncService {
             hash: block.header.hash,
             parentHash: block.header.parentHash,
             height: formatSortableInt(block.header.number),
-            timestamp: Number(block.header.timestamp),
+            timestamp: Number(block.header.timestamp / 1000n),
           });
 
           for (const tx of block.transactions) {
@@ -141,6 +138,9 @@ export class SyncService {
 
   async clear() {
     if (this.confirmations === undefined) {
+      return;
+    }
+    if (!await this.syncStatusRepo.initialized()) {
       return;
     }
 

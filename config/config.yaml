@@ -10,7 +10,7 @@ mysql:
 sync:
   interval: 10000
   blockLimitPerInterval: 20
-  blockSyncStart: 0
+  blockSyncStart: 15742000
 
   clearInterval: 120000
   confirmations: 100

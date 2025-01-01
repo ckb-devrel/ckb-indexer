@@ -10,27 +10,24 @@ export class SyncStatusRepo extends Repository<SyncStatus> {
     super(SyncStatus, manager);
   }
 
+  async initialized(): Promise<boolean> {
+    return await this.exists();
+  }
+
+  async syncHeight(key: string, defaultValue?: ccc.NumLike): Promise<SyncStatus> {
+    const found = await this.findOneBy({ key });
+    if (found) {
+      return found;
+    }
+    const status = this.create({ key, value: formatSortableInt(defaultValue ?? 0) });
+    return await this.save(status);
+  }
+
   async assertSyncHeight(key: string): Promise<SyncStatus> {
     const found = await this.findOneBy({ key });
     if (!found) {
       throw Error(`Sync status not found: ${key}`);
     }
-
-    return found;
-  }
-
-  async syncHeight(
-    key: string,
-    defaultValue?: ccc.NumLike,
-  ): Promise<SyncStatus> {
-    const found = await this.findOneBy({ key });
-    if (!found) {
-      if (defaultValue === undefined) {
-        throw Error(`Sync status not found: ${key}`);
-      }
-      return await this.create({ key, value: formatSortableInt(defaultValue) });
-    }
-
     return found;
   }
 
