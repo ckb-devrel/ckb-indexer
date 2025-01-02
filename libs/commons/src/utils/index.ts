@@ -1,8 +1,11 @@
 import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
+import spore from "@ckb-ccc/spore";
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Axios } from "axios";
 import { formatSortableInt } from "../ormUtils";
+import { ScriptMode } from "../rest";
 
 export function sleep(time: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, time));
@@ -111,4 +114,106 @@ export function headerToRepoBlock(
   block.height = formatSortableInt(header.number);
   block.parentHash = header.parentHash;
   return block;
+}
+
+export async function parseScriptMode(
+  script: ccc.ScriptLike,
+  client: ccc.Client,
+  rgbpp?: {
+    rgbppBtcCodeHash: ccc.Hex;
+    rgbppBtcHashType: ccc.HashType;
+  },
+): Promise<ScriptMode> {
+  if (
+    script.codeHash === rgbpp?.rgbppBtcCodeHash &&
+    script.hashType === rgbpp?.rgbppBtcHashType
+  ) {
+    return ScriptMode.Rgbpp;
+  }
+  const singleUseLock = await client.getKnownScript(
+    ccc.KnownScript.SingleUseLock,
+  );
+  if (
+    script.codeHash === singleUseLock?.codeHash &&
+    script.hashType === singleUseLock?.hashType
+  ) {
+    return ScriptMode.SingleUseLock;
+  }
+  const xudtType = await client.getKnownScript(ccc.KnownScript.XUdt);
+  if (
+    script.codeHash === xudtType.codeHash &&
+    script.hashType === xudtType.hashType
+  ) {
+    return ScriptMode.Xudt;
+  }
+  for (const clusterInfo of Object.values(
+    spore.getClusterScriptInfos(client),
+  )) {
+    if (
+      script.codeHash === clusterInfo?.codeHash &&
+      script.hashType === clusterInfo?.hashType
+    ) {
+      return ScriptMode.Cluster;
+    }
+  }
+  for (const sporeInfo of Object.values(spore.getSporeScriptInfos(client))) {
+    if (
+      script.codeHash === sporeInfo?.codeHash &&
+      script.hashType === sporeInfo?.hashType
+    ) {
+      return ScriptMode.Spore;
+    }
+  }
+  return ScriptMode.Unknown;
+}
+
+export async function parseAddress(
+  scriptLike: ccc.ScriptLike,
+  rgbpp?: {
+    btcRequester: Axios;
+    rgbppBtcCodeHash: ccc.Hex;
+    rgbppBtcHashType: ccc.HashType;
+  },
+): Promise<{
+  address: string;
+  btc?: {
+    txId: string;
+    outIndex: number;
+  };
+}> {
+  const script = ccc.Script.from(scriptLike);
+
+  if (
+    script.codeHash === rgbpp?.rgbppBtcCodeHash &&
+    script.hashType === rgbpp?.rgbppBtcHashType
+  ) {
+    const decoded = (() => {
+      try {
+        return RgbppLockArgs.decode(script.args);
+      } catch (err) {
+        throw new Error(
+          `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
+        );
+      }
+    })();
+
+    if (decoded) {
+      const { outIndex, txId } = decoded;
+      const { data } = await rgbpp?.btcRequester.post("/", {
+        method: "getrawtransaction",
+        params: [txId.slice(2), true],
+      });
+
+      if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+        throw new Error(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
+      } else {
+        return {
+          address: data?.result?.vout?.[outIndex]?.scriptPubKey?.address,
+          btc: decoded,
+        };
+      }
+    }
+  }
+
+  return { address: ccc.Address.fromScript(script, this.client).toString() };
 }

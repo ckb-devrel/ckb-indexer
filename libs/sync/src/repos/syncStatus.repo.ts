@@ -14,12 +14,18 @@ export class SyncStatusRepo extends Repository<SyncStatus> {
     return await this.exists();
   }
 
-  async syncHeight(key: string, defaultValue?: ccc.NumLike): Promise<SyncStatus> {
+  async syncHeight(
+    key: string,
+    defaultValue?: ccc.NumLike,
+  ): Promise<SyncStatus> {
     const found = await this.findOneBy({ key });
     if (found) {
       return found;
     }
-    const status = this.create({ key, value: formatSortableInt(defaultValue ?? 0) });
+    const status = this.create({
+      key,
+      value: formatSortableInt(defaultValue ?? 0),
+    });
     return await this.save(status);
   }
 

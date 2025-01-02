@@ -9,7 +9,11 @@ export class UdtInfoRepo extends Repository<UdtInfo> {
     super(UdtInfo, manager);
   }
 
-  async getTokenInfoByTokenId(tokenHash: ccc.HexLike): Promise<UdtInfo | null> {
-    return await this.findOneBy({ hash: ccc.hexFrom(tokenHash) });
+  async getTokenInfoByTokenId(
+    tokenHash: ccc.HexLike,
+  ): Promise<UdtInfo | undefined> {
+    return (
+      (await this.findOneBy({ hash: ccc.hexFrom(tokenHash) })) ?? undefined
+    );
   }
 }

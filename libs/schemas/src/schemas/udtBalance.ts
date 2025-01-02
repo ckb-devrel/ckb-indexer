@@ -29,6 +29,9 @@ export class UdtBalance {
   @Column({ type: "text" })
   address: string;
 
+  @Column({ type: "text", nullable: true })
+  ckbAddress?: string;
+
   /* === Statistic fields === */
   @Column({ type: "varchar" })
   capacity: string;

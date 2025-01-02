@@ -1,28 +1,18 @@
-import {
-  assertConfig,
-  parseAddress,
-  parseScriptMode,
-  RgbppLockArgs,
-  ScriptMode,
-} from "@app/commons";
+import { assertConfig, RgbppLockArgs } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { Axios } from "axios";
-import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
-export class CellService {
+export class SporeService {
+  private readonly logger = new Logger(SporeService.name);
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
   private readonly btcRequester: Axios;
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly udtInfoRepo: UdtInfoRepo,
-    private readonly udtBalanceRepo: UdtBalanceRepo,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
     this.client = isMainnet
@@ -42,13 +32,6 @@ export class CellService {
     });
   }
 
-  async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, {
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
-  }
-
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<{
     address: string;
     btc?: {
@@ -56,11 +39,41 @@ export class CellService {
       outIndex: number;
     };
   }> {
-    return await parseAddress(scriptLike, {
-      btcRequester: this.btcRequester,
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    const script = ccc.Script.from(scriptLike);
+
+    if (
+      script.codeHash === this.rgbppBtcCodeHash &&
+      script.hashType === this.rgbppBtcHashType
+    ) {
+      const decoded = (() => {
+        try {
+          return RgbppLockArgs.decode(script.args);
+        } catch (err) {
+          this.logger.warn(
+            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
+          );
+        }
+      })();
+
+      if (decoded) {
+        const { outIndex, txId } = decoded;
+        const { data } = await this.btcRequester.post("/", {
+          method: "getrawtransaction",
+          params: [txId.slice(2), true],
+        });
+
+        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+          this.logger.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
+        } else {
+          return {
+            address: data?.result?.vout?.[outIndex]?.scriptPubKey?.address,
+            btc: decoded,
+          };
+        }
+      }
+    }
+
+    return { address: ccc.Address.fromScript(script, this.client).toString() };
   }
 
   async getCellByOutpoint(
@@ -145,69 +158,5 @@ export class CellService {
       }
     }
     return spentCell ? { cell: spentCell, spentTx } : undefined;
-  }
-
-  async getPagedTokenCells(
-    tokenId: string,
-    address: string,
-    offset: number,
-    limit: number,
-  ): Promise<ccc.Cell[]> {
-    const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
-    if (!udtInfo) {
-      return [];
-    }
-
-    let lockScript: ccc.Script;
-    if (address.startsWith("ck")) {
-      lockScript = (await ccc.Address.fromString(address, this.client)).script;
-    } else {
-      const ckbAddress =
-        await this.udtBalanceRepo.getCkbAddressByBtcAddress(address);
-      if (!ckbAddress) {
-        return [];
-      }
-      lockScript = (await ccc.Address.fromString(ckbAddress, this.client))
-        .script;
-    }
-    const typeScript: ccc.ScriptLike = {
-      codeHash: udtInfo.typeCodeHash,
-      hashType: udtInfo.typeCodeHash,
-      args: udtInfo.typeArgs,
-    };
-
-    const searchLimit = 30;
-    const cells: ccc.Cell[] = [];
-    let lastCursor: string | undefined;
-    while (offset > 0) {
-      const result = await this.client.findCellsPaged(
-        {
-          script: lockScript,
-          scriptType: "lock",
-          scriptSearchMode: "exact",
-          filter: {
-            script: typeScript,
-          },
-        },
-        "asc",
-        searchLimit,
-        lastCursor,
-      );
-      lastCursor = result.lastCursor;
-      if (result.cells.length <= offset) {
-        offset -= result.cells.length;
-        continue;
-      } else {
-        cells.push(...result.cells.slice(offset));
-        offset = 0;
-        if (cells.length >= limit) {
-          break;
-        }
-      }
-      if (result.cells.length < searchLimit) {
-        break;
-      }
-    }
-    return cells.slice(0, limit);
   }
 }
