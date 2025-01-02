@@ -11,6 +11,9 @@ importers:
       '@ckb-ccc/core':
         specifier: ^1.2.1
         version: 1.2.1(typescript@5.7.2)
+      '@ckb-ccc/spore':
+        specifier: ^1.0.5
+        version: 1.0.5(typescript@5.7.2)
       '@nestjs/common':
         specifier: ^10.0.0
         version: 10.4.15(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -323,6 +326,12 @@ packages:
 
   '@ckb-ccc/core@1.2.1':
     resolution: {integrity: sha512-wU+Q7znpDtKIcZU3yC6pN1D7K2xZZiuQC4bttgtBPoCAl/EhL52iyRW4jjUPw5GeweIdvFXMSYNf6uvm3vNNEA==}
+<<<<<<< HEAD
+=======
+
+  '@ckb-ccc/spore@1.0.5':
+    resolution: {integrity: sha512-nsTGWbppERP1XfZ2t5cb3QcSrfeCXq6TYuSLN9iMPxItS3GbWqHeDHLgpIoHC3FQR4gBcteI/VPWhjhQXu2Jvg==}
+>>>>>>> c6c3e54 (feat: add spore and asset module)
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -3564,6 +3573,18 @@ snapshots:
       ws: 8.18.0
     transitivePeerDependencies:
       - bufferutil
+      - encoding
+      - typescript
+      - utf-8-validate
+      - zod
+
+  '@ckb-ccc/spore@1.0.5(typescript@5.7.2)':
+    dependencies:
+      '@ckb-ccc/core': 1.2.1(typescript@5.7.2)
+      axios: 1.7.9
+    transitivePeerDependencies:
+      - bufferutil
+      - debug
       - encoding
       - typescript
       - utf-8-validate

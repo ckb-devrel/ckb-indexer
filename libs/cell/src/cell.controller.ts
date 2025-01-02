@@ -1,4 +1,4 @@
-import { assert, RpcError, TokenCell } from "@app/commons";
+import { assert, asyncMap, RpcError, TokenCell } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get } from "@nestjs/common";
 import { CellService } from "./cell.service";
@@ -14,16 +14,17 @@ export class CellController {
     const { address, btc } = await this.service.scriptToAddress(
       cell.cellOutput.lock,
     );
+    const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     return {
       txId: cell.outPoint.txHash,
       vout: Number(cell.outPoint.index),
       lockScript: {
         ...cell.cellOutput.lock,
-        codeHashType: await this.service.parseScriptMode(cell.cellOutput.lock),
+        codeHashType: await this.service.scriptMode(cell.cellOutput.lock),
       },
       typeScript: {
-        ...cell.cellOutput.type!,
-        codeHashType: await this.service.parseScriptMode(cell.cellOutput.type!),
+        ...typeScript,
+        codeHashType: await this.service.scriptMode(typeScript),
       },
       ownerAddress: address,
       capacity: ccc.numFrom(cell.cellOutput.capacity),
@@ -56,5 +57,21 @@ export class CellController {
     );
     assert(cell.cellOutput.type, RpcError.CellNotAsset);
     return await this.cellToTokenCell(cell, spentTx);
+  }
+
+  @Get("/getUserTokenCells")
+  async getUserTokenCells(
+    tokenId: string,
+    address: string,
+    offset: number,
+    limit: number,
+  ): Promise<TokenCell[]> {
+    const pagedCells = await this.service.getPagedTokenCells(
+      tokenId,
+      address,
+      offset,
+      limit,
+    );
+    return await asyncMap(pagedCells, this.cellToTokenCell);
   }
 }

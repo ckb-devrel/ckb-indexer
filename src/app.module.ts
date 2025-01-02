@@ -4,7 +4,7 @@ import { SyncModule } from "@app/sync";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { CellModule } from "libs/cell/src";
-import { XudtModule } from "libs/xudt/src";
+import { UdtModule } from "libs/udt/src";
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { XudtModule } from "libs/xudt/src";
     SchemasModule,
     SyncModule,
     CellModule,
-    XudtModule,
+    UdtModule,
   ],
 })
 export class AppModule {}

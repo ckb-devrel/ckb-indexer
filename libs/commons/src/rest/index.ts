@@ -10,6 +10,7 @@ export enum ScriptMode {
   SingleUseLock,
   Xudt,
   Spore,
+  Cluster,
   Unknown,
 }
 
@@ -24,7 +25,7 @@ export interface TokenData {
   tokenId: ccc.Hex;
   name?: string;
   symbol?: string;
-  decimal?: ccc.Num;
+  decimal?: number;
   owner?: string;
 }
 
@@ -90,7 +91,7 @@ export interface ClusterData {
 
 export interface ClusterInfo {
   name: string;
-  description: string;
+  description?: string;
   clusterType: "public" | "private";
   clusterId: ccc.Hex;
   owner: string;
@@ -126,8 +127,8 @@ export interface NFTInfo {
 
 export interface AssetTxData {
   txId: ccc.Hex;
-  blockHash: ccc.Hex;
-  blockHeight: ccc.Num;
+  blockHash?: ccc.Hex;
+  blockHeight?: ccc.Num;
   tokenInfos: TokenData[];
   clusterInfos: ClusterData[];
   sporeInfos: NFTData[];

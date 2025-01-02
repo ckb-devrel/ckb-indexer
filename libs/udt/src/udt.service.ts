@@ -1,4 +1,9 @@
-import { assertConfig, headerToRepoBlock, ScriptMode } from "@app/commons";
+import {
+  assertConfig,
+  headerToRepoBlock,
+  parseScriptMode,
+  ScriptMode,
+} from "@app/commons";
 import { Block, UdtBalance, UdtInfo } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable } from "@nestjs/common";
@@ -7,7 +12,7 @@ import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 import { BlockRepo } from "./repos/block.repo";
 
 @Injectable()
-export class XudtService {
+export class UdtService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
@@ -89,7 +94,7 @@ export class XudtService {
   }
 
   async getTokenHoldersCount(tokenId: ccc.HexLike): Promise<number> {
-    return this.udtBalanceRepo.countBy({ tokenHash: ccc.hexFrom(tokenId) });
+    return this.udtBalanceRepo.getItemCountByTokenHash(tokenId);
   }
 
   async getTokenBalance(
@@ -103,30 +108,10 @@ export class XudtService {
     return await this.udtBalanceRepo.getTokenByTokenId(tokenId);
   }
 
-  async parseScriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    if (
-      script.codeHash === this.rgbppBtcCodeHash &&
-      script.hashType === this.rgbppBtcHashType
-    ) {
-      return ScriptMode.Rgbpp;
-    }
-    const singleUseLock = await this.client.getKnownScript(
-      ccc.KnownScript.SingleUseLock,
-    );
-    if (
-      script.codeHash === singleUseLock.codeHash &&
-      script.hashType === singleUseLock.hashType
-    ) {
-      return ScriptMode.SingleUseLock;
-    }
-    const xudtType = await this.client.getKnownScript(ccc.KnownScript.XUdt);
-    if (
-      script.codeHash === xudtType.codeHash &&
-      script.hashType === xudtType.hashType
-    ) {
-      return ScriptMode.Xudt;
-    }
-    // todo: add spore script
-    return ScriptMode.Unknown;
+  async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
+    return await parseScriptMode(script, this.client, {
+      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
+      rgbppBtcHashType: this.rgbppBtcHashType,
+    });
   }
 }

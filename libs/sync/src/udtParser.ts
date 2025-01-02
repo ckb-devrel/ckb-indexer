@@ -2,8 +2,8 @@ import {
   assertConfig,
   formatSortable,
   formatSortableInt,
+  parseAddress,
   parseSortableInt,
-  RgbppLockArgs,
   withTransaction,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
@@ -62,41 +62,14 @@ class UdtParser {
     public readonly blockHeight: ccc.Num,
   ) {}
 
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    const script = ccc.Script.from(scriptLike);
-
-    if (
-      script.codeHash === this.context.rgbppBtcCodeHash &&
-      script.hashType === this.context.rgbppBtcHashType
-    ) {
-      const decoded = (() => {
-        try {
-          return RgbppLockArgs.decode(script.args);
-        } catch (err) {
-          this.context.logger.warn(
-            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-          );
-        }
-      })();
-
-      if (decoded) {
-        const { outIndex, txId } = decoded;
-        const { data } = await this.context.btcRequester.post("/", {
-          method: "getrawtransaction",
-          params: [txId.slice(2), true],
-        });
-
-        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-          this.context.logger.warn(
-            `Failed to get btc rgbpp utxo ${txId}:${outIndex}`,
-          );
-        } else {
-          return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
-        }
-      }
-    }
-
-    return ccc.Address.fromScript(script, this.context.client).toString();
+  async scriptToAddress(
+    scriptLike: ccc.ScriptLike,
+  ): Promise<{ address: string; btc?: { txId: string; outIndex: number } }> {
+    return await parseAddress(scriptLike, {
+      btcRequester: this.context.btcRequester,
+      rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
+      rgbppBtcHashType: this.context.rgbppBtcHashType,
+    });
   }
 
   async udtInfoHandleTx(
@@ -191,7 +164,7 @@ class UdtParser {
           /* === Update UDT Balance === */
           await Promise.all(
             diffs.map(async (diff) => {
-              const address = await this.scriptToAddress(diff.lock);
+              const { address, btc } = await this.scriptToAddress(diff.lock);
               const addressHash = ccc.hashCkb(ccc.bytesFrom(address, "utf8"));
 
               const existedUdtBalance = await udtBalanceRepo.findOne({
@@ -211,6 +184,12 @@ class UdtParser {
                   updatedAtHeight: formatSortable(this.blockHeight),
 
                   address,
+                  ckbAddress: btc
+                    ? ccc.Address.fromScript(
+                        diff.lock,
+                        this.context.client,
+                      ).toString()
+                    : undefined,
                   balance: formatSortable("0"),
                   capacity: formatSortable("0"),
                 }),

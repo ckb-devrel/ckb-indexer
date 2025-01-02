@@ -12,11 +12,11 @@ import {
 import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get, Query } from "@nestjs/common";
-import { XudtService } from "./xudt.service";
+import { UdtService } from "./udt.service";
 
 @Controller()
-export class XudtController {
-  constructor(private readonly service: XudtService) {}
+export class UdtController {
+  constructor(private readonly service: UdtService) {}
 
   async udtBalanceToTokenBalance(
     udtBalance: UdtBalance,
@@ -48,13 +48,11 @@ export class XudtController {
     const issueBlock = assert(block, RpcError.BlockNotFound);
     const holderCount = await this.service.getTokenHoldersCount(tokenId);
     const rgbppIssue = await asyncSome(issueTx.outputs, async (output) => {
-      return (
-        (await this.service.parseScriptMode(output.lock)) === ScriptMode.Rgbpp
-      );
+      return (await this.service.scriptMode(output.lock)) === ScriptMode.Rgbpp;
     });
     const oneTimeIssue = await asyncSome(issueTx.outputs, async (output) => {
       return (
-        (await this.service.parseScriptMode(output.lock)) ===
+        (await this.service.scriptMode(output.lock)) ===
         ScriptMode.SingleUseLock
       );
     });
