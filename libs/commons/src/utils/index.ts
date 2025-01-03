@@ -3,7 +3,7 @@ import { ccc } from "@ckb-ccc/core";
 import spore from "@ckb-ccc/spore";
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Axios } from "axios";
+import { AxiosInstance } from "axios";
 import { formatSortableInt } from "../ormUtils";
 import { ScriptMode } from "../rest";
 
@@ -170,7 +170,7 @@ export async function parseScriptMode(
 export async function parseAddress(
   scriptLike: ccc.ScriptLike,
   rgbpp?: {
-    btcRequester: Axios;
+    btcRequester: AxiosInstance;
     rgbppBtcCodeHash: ccc.Hex;
     rgbppBtcHashType: ccc.HashType;
   },

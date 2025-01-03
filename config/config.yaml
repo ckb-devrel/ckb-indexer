@@ -35,3 +35,4 @@ sync:
   isMainnet: false
   ckbRpcUri: wss://testnet.ckb.dev/ws
   btcRpcUri: https://rpc.ankr.com/btc_signet
+  decoderServerUri: http://localhost:3000

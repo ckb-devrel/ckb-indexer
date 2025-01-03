@@ -40,56 +40,56 @@ export class UdtService {
   async getTokenInfo(
     tokenId: ccc.HexLike,
     withTxAndBlock: boolean = false,
-  ): Promise<{
-    udtInfo: UdtInfo;
-    tx?: ccc.Transaction;
-    block?: Block;
-  } | null> {
+  ): Promise<
+    | {
+        udtInfo: UdtInfo;
+        tx?: ccc.Transaction;
+        block?: Block;
+      }
+    | undefined
+  > {
     const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
     if (!udtInfo) {
-      return null;
+      return;
     }
-    if (withTxAndBlock) {
-      const issueTx = await this.client.getTransaction(
-        udtInfo.firstIssuanceTxHash,
-      );
-      if (!issueTx) {
-        return { udtInfo };
-      }
-      const issueBlock = await this.blockRepo.getBlockByHashOrNumber({
-        hash: issueTx.blockHash,
-        number: issueTx.blockNumber,
-      });
-      if (!issueBlock) {
-        if (issueTx.blockHash) {
-          const header = await this.client.getHeaderByHash(issueTx.blockHash);
-          return {
-            udtInfo,
-            tx: issueTx.transaction,
-            block: headerToRepoBlock(header),
-          };
-        } else if (issueTx.blockNumber) {
-          const header = await this.client.getHeaderByNumber(
-            issueTx.blockNumber,
-          );
-          return {
-            udtInfo,
-            tx: issueTx.transaction,
-            block: headerToRepoBlock(header),
-          };
-        } else {
-          throw new Error(
-            "issueTx.blockHash or issueTx.blockNumber should be provided",
-          );
-        }
-      }
+    if (!withTxAndBlock) {
+      return { udtInfo };
+    }
+    const issueTx = await this.client.getTransaction(
+      udtInfo.firstIssuanceTxHash,
+    );
+    if (!issueTx) {
+      return { udtInfo };
+    }
+    const issueBlock = await this.blockRepo.getBlockByHashOrNumber({
+      hash: issueTx.blockHash,
+      number: issueTx.blockNumber,
+    });
+    if (issueBlock) {
       return {
         udtInfo,
         tx: issueTx.transaction,
         block: issueBlock,
       };
+    }
+    if (issueTx.blockHash) {
+      const header = await this.client.getHeaderByHash(issueTx.blockHash);
+      return {
+        udtInfo,
+        tx: issueTx.transaction,
+        block: headerToRepoBlock(header),
+      };
+    } else if (issueTx.blockNumber) {
+      const header = await this.client.getHeaderByNumber(issueTx.blockNumber);
+      return {
+        udtInfo,
+        tx: issueTx.transaction,
+        block: headerToRepoBlock(header),
+      };
     } else {
-      return { udtInfo };
+      throw new Error(
+        "issueTx.blockHash or issueTx.blockNumber should be provided",
+      );
     }
   }
 

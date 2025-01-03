@@ -2,7 +2,7 @@ import { assertConfig, RgbppLockArgs } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { Axios } from "axios";
+import axios, { AxiosInstance } from "axios";
 
 @Injectable()
 export class SporeService {
@@ -10,7 +10,7 @@ export class SporeService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
-  private readonly btcRequester: Axios;
+  private readonly btcRequester: AxiosInstance;
 
   constructor(private readonly configService: ConfigService) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");

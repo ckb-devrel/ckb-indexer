@@ -9,14 +9,14 @@ import {
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { Axios } from "axios";
+import axios, { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class UdtParserBuilder {
   public readonly logger = new Logger(UdtParserBuilder.name);
-  public readonly btcRequester: Axios;
+  public readonly btcRequester: AxiosInstance;
   public readonly client: ccc.Client;
 
   public readonly udtTypes: ccc.Script[];
@@ -286,30 +286,27 @@ class UdtParser {
     let netBalance = ccc.Zero;
     let netCapacity = ccc.Zero;
 
-    await Promise.all(
-      tx.inputs.map(async (input) => {
-        await input.completeExtraInfos(this.context.client);
-        if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
-          return;
-        }
-        const lock = input.cellOutput.lock;
-        const lockHash = lock.hash();
-        const diff = diffs.get(lockHash) ?? {
-          lock,
-          balance: ccc.Zero,
-          capacity: ccc.Zero,
-        };
+    tx.inputs.forEach((input) => {
+      if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
+        return;
+      }
+      const lock = input.cellOutput.lock;
+      const lockHash = lock.hash();
+      const diff = diffs.get(lockHash) ?? {
+        lock,
+        balance: ccc.Zero,
+        capacity: ccc.Zero,
+      };
 
-        const balance = ccc.udtBalanceFrom(input.outputData ?? "00".repeat(16));
-        diff.balance -= balance;
-        diff.capacity -= input.cellOutput.capacity;
+      const balance = ccc.udtBalanceFrom(input.outputData ?? "00".repeat(16));
+      diff.balance -= balance;
+      diff.capacity -= input.cellOutput.capacity;
 
-        diffs.set(lockHash, diff);
+      diffs.set(lockHash, diff);
 
-        netBalance -= balance;
-        netCapacity -= input.cellOutput.capacity;
-      }),
-    );
+      netBalance -= balance;
+      netCapacity -= input.cellOutput.capacity;
+    });
     for (const i in tx.outputs) {
       const output = tx.outputs[i];
       const outputData = tx.outputsData[i];

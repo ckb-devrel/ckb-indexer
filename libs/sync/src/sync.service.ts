@@ -18,6 +18,7 @@ import {
 } from "typeorm";
 import { SyncStatusRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
 import { BlockRepo } from "./repos/block.repo";
+import { SporeParserBuilder } from "./sporeParser";
 import { UdtParserBuilder } from "./udtParser";
 
 const SYNC_KEY = "SYNCED";
@@ -39,6 +40,7 @@ export class SyncService {
   constructor(
     configService: ConfigService,
     private readonly udtParserBuilder: UdtParserBuilder,
+    private readonly sporeParserBuilder: SporeParserBuilder,
     private readonly entityManager: EntityManager,
     private readonly syncStatusRepo: SyncStatusRepo,
     private readonly udtInfoRepo: UdtInfoRepo,
@@ -102,6 +104,7 @@ export class SyncService {
       }
 
       const udtParser = this.udtParserBuilder.build(i);
+      const sporeParser = this.sporeParserBuilder.build(i);
 
       await withTransaction(
         this.entityManager,
@@ -117,7 +120,13 @@ export class SyncService {
           });
 
           for (const tx of block.transactions) {
+            await Promise.all(
+              tx.inputs.map(async (input) =>
+                input.completeExtraInfos(this.client),
+              ),
+            );
             await udtParser.udtInfoHandleTx(entityManager, tx);
+            await sporeParser.sporeInfoHandleTx(entityManager, tx);
           }
 
           await syncStatusRepo.updateSyncHeight(pendingStatus, i);
