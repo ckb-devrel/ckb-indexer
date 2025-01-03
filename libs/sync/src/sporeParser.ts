@@ -39,7 +39,7 @@ export class SporeParserBuilder {
       ? new ccc.ClientPublicMainnet({ url: ckbRpcUri })
       : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
 
-    this.decoderUri = assertConfig(configService, "sync.dobDecoderUri");
+    this.decoderUri = assertConfig(configService, "sync.decoderServerUri");
     this.btcRequester = axios.create({
       baseURL: assertConfig(configService, "sync.btcRpcUri"),
     });
@@ -56,10 +56,24 @@ export class SporeParserBuilder {
   }
 }
 
+interface SporeDetail {
+  content: string;
+  contentType: string;
+  clusterId?: ccc.Hex;
+  dobDecoded?: string;
+}
+
+interface ClusterDetial {
+  name: string;
+  description: string;
+}
+
 interface Flow {
   asset: {
     script: ccc.Script;
     data: ccc.Hex;
+    spore?: SporeDetail;
+    cluster?: ClusterDetial;
   };
   mint?: {
     to: string;
@@ -82,22 +96,21 @@ class SporeParser {
   async scriptToAddress(
     scriptLike: ccc.ScriptLike,
   ): Promise<{ address: string; btc?: { txId: string; outIndex: number } }> {
-    return await parseAddress(scriptLike, {
-      btcRequester: this.context.btcRequester,
-      rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.context.rgbppBtcHashType,
-    });
-  }
-
-  async checkScriptMode(
-    script: ccc.Script | undefined,
-    expectedMode: ScriptMode,
-  ): Promise<boolean> {
-    if (!script) {
-      return false;
+    try {
+      return await parseAddress(scriptLike, this.context.client, {
+        btcRequester: this.context.btcRequester,
+        rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
+        rgbppBtcHashType: this.context.rgbppBtcHashType,
+      });
+    } catch (error) {
+      this.context.logger.error(`Failed to parse address: ${error}`);
+      return {
+        address: ccc.Address.fromScript(
+          scriptLike,
+          this.context.client,
+        ).toString(),
+      };
     }
-    const mode = await parseScriptMode(script, this.context.client);
-    return mode === expectedMode;
   }
 
   async analyzeFlow(
@@ -105,28 +118,41 @@ class SporeParser {
     mode: ScriptMode,
   ): Promise<Record<string, Flow>> {
     const flows: Record<string, Flow> = {};
+
+    // Collect all spore or cluster in the inputs
     for (const input of tx.inputs) {
-      if (!this.checkScriptMode(input.cellOutput?.type, mode)) {
+      const { cellOutput, outputData } = input;
+      if (!cellOutput || !outputData || !cellOutput.type) {
         continue;
       }
-      const { address } = await this.scriptToAddress(input.cellOutput!.lock);
-      const sporeOrClusterId = input.cellOutput!.type!.args;
+      const expectedMode = await parseScriptMode(cellOutput.type, this.context.client);
+      if (expectedMode !== mode) {
+        continue;
+      }
+      const { address } = await this.scriptToAddress(cellOutput.lock);
+      const sporeOrClusterId = cellOutput.type.args;
       flows[sporeOrClusterId] = {
         asset: {
-          script: input.cellOutput!.type!,
-          data: input.outputData!,
+          script: cellOutput.type,
+          data: outputData,
         },
         burn: {
           from: address,
         },
       };
     }
+
+    // Collect and update all spore or cluster from the outputs
     for (const [index, output] of tx.outputs.entries()) {
-      if (!this.checkScriptMode(output.type, mode)) {
+      if (!output.type) {
+        continue;
+      }
+      const expectedMode = await parseScriptMode(output.type, this.context.client);
+      if (expectedMode !== mode) {
         continue;
       }
       const { address } = await this.scriptToAddress(output.lock);
-      const sporeOrClusterId = output.type!.args;
+      const sporeOrClusterId = output.type.args;
       const burnSpore = flows[sporeOrClusterId];
       if (burnSpore) {
         flows[sporeOrClusterId] = {
@@ -139,7 +165,7 @@ class SporeParser {
       } else {
         flows[sporeOrClusterId] = {
           asset: {
-            script: output.type!,
+            script: output.type,
             data: tx.outputsData[index],
           },
           mint: {
@@ -148,18 +174,24 @@ class SporeParser {
         };
       }
     }
+
+    // Parse spore or cluster data before the persistence
+    for (const [id, flow] of Object.entries(flows)) {
+      if (mode === ScriptMode.Spore) {
+        flow.asset.spore = await this.parseSporeData(
+          ccc.hexFrom(id),
+          flow.asset.data,
+        );
+      } else {
+        flow.asset.cluster = this.parseClusterData(flow.asset.data);
+      }
+      flows[id] = flow;
+    }
+
     return flows;
   }
 
-  async parseSporeData(
-    sporeId: ccc.Hex,
-    data: ccc.Hex,
-  ): Promise<{
-    contentType: string;
-    content: string;
-    clusterId?: ccc.Hex;
-    dobDecoded?: string;
-  }> {
+  async parseSporeData(sporeId: ccc.Hex, data: ccc.Hex): Promise<SporeDetail> {
     const sporeData = unpackToRawSporeData(ccc.bytesFrom(data));
     const decoded = {
       contentType: sporeData.contentType,
@@ -180,10 +212,7 @@ class SporeParser {
     return decoded;
   }
 
-  parseClusterData(data: ccc.Hex): {
-    name: string;
-    description: string;
-  } {
+  parseClusterData(data: ccc.Hex): ClusterDetial {
     return unpackToRawClusterData(ccc.bytesFrom(data));
   }
 
@@ -195,62 +224,84 @@ class SporeParser {
   ) {
     const { asset, mint, transfer, burn } = flow;
     const prevSpore = await sporeRepo.findOneBy({ sporeId });
+
     if (mint) {
       if (prevSpore) {
-        throw new Error(`Spore already exists when minting: ${sporeId}`);
+        this.context.logger.error(
+          `Spore already exists when minting: ${sporeId}`,
+        );
+        await sporeRepo.delete(prevSpore);
       }
-      const sporeData = await this.parseSporeData(sporeId, asset.data);
       const spore = sporeRepo.create({
         sporeId,
-        ...sporeData,
+        ...asset.spore,
         creatorAddress: mint.to,
         ownerAddress: mint.to,
         createTxHash: txHash,
         updatedAtHeight: formatSortableInt(this.blockHeight),
       });
       await sporeRepo.save(spore);
+      this.context.logger.log(`Mint Spore ${sporeId} at tx ${txHash}`);
     }
+
     if (transfer) {
-      if (!prevSpore) {
-        throw new Error(`Spore not found when transferring: ${sporeId}`);
-      }
-      if (prevSpore.ownerAddress !== transfer.from) {
-        throw new Error(
+      if (prevSpore && prevSpore.ownerAddress !== transfer.from) {
+        this.context.logger.error(
           `Spore owner mismatch when transferring: ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${transfer.from}`,
         );
+        await sporeRepo.delete(prevSpore);
       }
-      const spore = sporeRepo.create({
-        ...prevSpore,
-        ownerAddress: transfer.to,
-        updateFromId: prevSpore.id,
-        updatedAtHeight: formatSortableInt(this.blockHeight),
-        id:
-          prevSpore.updatedAtHeight === formatSortableInt(this.blockHeight)
-            ? prevSpore.id
-            : undefined,
-      });
-      await sporeRepo.save(spore);
-    }
-    if (burn) {
       if (!prevSpore) {
-        throw new Error(`Spore not found when burning: ${sporeId}`);
-      }
-      if (prevSpore.ownerAddress !== burn.from) {
-        throw new Error(
-          `Spore owner mismatch when burning: ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${burn.from}`,
+        this.context.logger.error(
+          `Spore not found when transferring: ${sporeId}`,
         );
       }
       const spore = sporeRepo.create({
-        ...prevSpore,
-        ownerAddress: undefined,
-        updateFromId: prevSpore.id,
+        ...(prevSpore ?? {
+          sporeId,
+          ...asset.spore,
+          creatorAddress: transfer.from,
+          createTxHash: txHash,
+        }),
+        ownerAddress: transfer.to,
+        updateFromId: prevSpore?.id,
         updatedAtHeight: formatSortableInt(this.blockHeight),
         id:
-          prevSpore.updatedAtHeight === formatSortableInt(this.blockHeight)
+          prevSpore?.updatedAtHeight === formatSortableInt(this.blockHeight)
             ? prevSpore.id
             : undefined,
       });
       await sporeRepo.save(spore);
+      this.context.logger.log(`Transfer Spore ${sporeId} at tx ${txHash}`);
+    }
+
+    if (burn) {
+      if (prevSpore && prevSpore.ownerAddress !== burn.from) {
+        this.context.logger.error(
+          `Spore owner mismatch when burning: ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${burn.from}`,
+        );
+        await sporeRepo.delete(prevSpore);
+      }
+      if (!prevSpore) {
+        this.context.logger.error(`Spore not found when burning: ${sporeId}`);
+      }
+      const spore = sporeRepo.create({
+        ...(prevSpore ?? {
+          sporeId,
+          ...asset.spore,
+          creatorAddress: burn.from,
+          createTxHash: txHash,
+        }),
+        ownerAddress: undefined,
+        updateFromId: prevSpore?.id,
+        updatedAtHeight: formatSortableInt(this.blockHeight),
+        id:
+          prevSpore?.updatedAtHeight === formatSortableInt(this.blockHeight)
+            ? prevSpore.id
+            : undefined,
+      });
+      await sporeRepo.save(spore);
+      this.context.logger.log(`Burn Spore ${sporeId} at tx ${txHash}`);
     }
   }
 
@@ -262,55 +313,73 @@ class SporeParser {
   ) {
     const { asset, mint, transfer, burn } = flow;
     const prevCluster = await clusterRepo.findOneBy({ clusterId });
+
     if (mint) {
       if (prevCluster) {
-        throw new Error(`Cluster already exists when minting: ${clusterId}`);
+        this.context.logger.error(
+          `Cluster already exists when minting: ${clusterId}`,
+        );
+        await clusterRepo.delete(prevCluster);
       }
-      const clusterData = this.parseClusterData(asset.data);
       const cluster = clusterRepo.create({
         clusterId,
-        ...clusterData,
+        ...asset.cluster,
         creatorAddress: mint.to,
         ownerAddress: mint.to,
         createTxHash: txHash,
         updatedAtHeight: formatSortableInt(this.blockHeight),
       });
       await clusterRepo.save(cluster);
+      this.context.logger.log(`Mint Cluster ${clusterId} at tx ${txHash}`);
     }
+
     if (transfer) {
-      if (!prevCluster) {
-        throw new Error(`Cluster not found when transferring: ${clusterId}`);
-      }
-      if (prevCluster.ownerAddress !== transfer.from) {
-        throw new Error(
+      if (prevCluster && prevCluster.ownerAddress !== transfer.from) {
+        this.context.logger.error(
           `Cluster owner mismatch when transferring: ${clusterId}, expected: ${prevCluster.ownerAddress}, actual: ${transfer.from}`,
+        );
+        await clusterRepo.delete(prevCluster);
+      }
+      if (!prevCluster) {
+        this.context.logger.error(
+          `Cluster not found when transferring: ${clusterId}`,
         );
       }
       const cluster = clusterRepo.create({
-        ...prevCluster,
+        ...(prevCluster ?? {
+          clusterId,
+          ...asset.cluster,
+          creatorAddress: transfer.from,
+          createTxHash: txHash,
+        }),
         ownerAddress: transfer.to,
-        updateFromId: prevCluster.id,
+        updateFromId: prevCluster?.id,
         updatedAtHeight: formatSortableInt(this.blockHeight),
         id:
-          prevCluster.updatedAtHeight === formatSortableInt(this.blockHeight)
+          prevCluster?.updatedAtHeight === formatSortableInt(this.blockHeight)
             ? prevCluster.id
             : undefined,
       });
       await clusterRepo.save(cluster);
+      this.context.logger.log(`Transfer Cluster ${clusterId} at tx ${txHash}`);
     }
+
     if (burn) {
-      throw new Error(`Cluster burn is not supported: ${clusterId}`);
+      this.context.logger.error(`Cluster burn is not supported: ${clusterId}`);
     }
   }
 
   async sporeInfoHandleTx(entityManager: EntityManager, tx: ccc.Transaction) {
     const sporeFlows = await this.analyzeFlow(tx, ScriptMode.Spore);
     const clusterFlows = await this.analyzeFlow(tx, ScriptMode.Cluster);
+
     withTransaction(
       this.context.entityManager,
       entityManager,
       async (entityManager) => {
         const sporeRepo = new SporeRepo(entityManager);
+        const clusterRepo = new ClusterRepo(entityManager);
+
         for (const [sporeId, flow] of Object.entries(sporeFlows)) {
           await this.handleSporeFlow(
             tx.hash(),
@@ -319,7 +388,7 @@ class SporeParser {
             sporeRepo,
           );
         }
-        const clusterRepo = new ClusterRepo(entityManager);
+
         for (const [clusterId, flow] of Object.entries(clusterFlows)) {
           await this.handleClusterFlow(
             tx.hash(),

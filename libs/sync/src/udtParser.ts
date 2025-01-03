@@ -65,11 +65,21 @@ class UdtParser {
   async scriptToAddress(
     scriptLike: ccc.ScriptLike,
   ): Promise<{ address: string; btc?: { txId: string; outIndex: number } }> {
-    return await parseAddress(scriptLike, {
-      btcRequester: this.context.btcRequester,
-      rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.context.rgbppBtcHashType,
-    });
+    try {
+      return await parseAddress(scriptLike, this.context.client, {
+        btcRequester: this.context.btcRequester,
+        rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
+        rgbppBtcHashType: this.context.rgbppBtcHashType,
+      });
+    } catch (error) {
+      this.context.logger.error(`Failed to parse address: ${error}`);
+      return {
+        address: ccc.Address.fromScript(
+          scriptLike,
+          this.context.client,
+        ).toString(),
+      };
+    }
   }
 
   async udtInfoHandleTx(
@@ -222,15 +232,12 @@ class UdtParser {
     const tx = ccc.Transaction.from(txLike);
 
     const scripts: Map<string, ccc.Script> = new Map();
-    await Promise.all(
-      tx.inputs.map(async (input) => {
-        await input.completeExtraInfos(this.context.client);
-        if (!input.cellOutput?.type) {
-          return;
-        }
-        scripts.set(input.cellOutput.type.hash(), input.cellOutput.type);
-      }),
-    );
+    tx.inputs.forEach((input) => {
+      if (!input.cellOutput?.type) {
+        return;
+      }
+      scripts.set(input.cellOutput.type.hash(), input.cellOutput.type);
+    });
     for (const output of tx.outputs) {
       if (!output.type) {
         continue;

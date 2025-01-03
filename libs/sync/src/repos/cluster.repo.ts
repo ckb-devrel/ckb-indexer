@@ -5,6 +5,6 @@ import { EntityManager, Repository } from "typeorm";
 @Injectable()
 export class ClusterRepo extends Repository<Cluster> {
   constructor(manager: EntityManager) {
-    super(ClusterRepo, manager);
+    super(Cluster, manager);
   }
 }

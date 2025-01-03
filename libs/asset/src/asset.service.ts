@@ -55,7 +55,7 @@ export class AssetService {
       outIndex: number;
     };
   }> {
-    return await parseAddress(scriptLike, {
+    return await parseAddress(scriptLike, this.client, {
       btcRequester: this.btcRequester,
       rgbppBtcCodeHash: this.rgbppBtcCodeHash,
       rgbppBtcHashType: this.rgbppBtcHashType,

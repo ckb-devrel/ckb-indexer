@@ -16,13 +16,18 @@ import {
   LessThanOrEqual,
   MoreThan,
 } from "typeorm";
-import { SyncStatusRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import {
+  PENDING_KEY,
+  SYNC_KEY,
+  SyncStatusRepo,
+  UdtBalanceRepo,
+  UdtInfoRepo,
+} from "./repos";
 import { BlockRepo } from "./repos/block.repo";
+import { ClusterRepo } from "./repos/cluster.repo";
+import { SporeRepo } from "./repos/spore.repo";
 import { SporeParserBuilder } from "./sporeParser";
 import { UdtParserBuilder } from "./udtParser";
-
-const SYNC_KEY = "SYNCED";
-const PENDING_KEY = "PENDING";
 
 @Injectable()
 export class SyncService {
@@ -45,6 +50,8 @@ export class SyncService {
     private readonly syncStatusRepo: SyncStatusRepo,
     private readonly udtInfoRepo: UdtInfoRepo,
     private readonly udtBalanceRepo: UdtBalanceRepo,
+    private readonly sporeRepo: SporeRepo,
+    private readonly clusterRepo: ClusterRepo,
     private readonly blockRepo: BlockRepo,
   ) {
     this.client = new ccc.ClientPublicTestnet();
@@ -120,11 +127,9 @@ export class SyncService {
           });
 
           for (const tx of block.transactions) {
-            await Promise.all(
-              tx.inputs.map(async (input) =>
-                input.completeExtraInfos(this.client),
-              ),
-            );
+            for (let i = 0; i < tx.inputs.length; ++i) {
+              await tx.inputs[i].completeExtraInfos(this.client);
+            }
             await udtParser.udtInfoHandleTx(entityManager, tx);
             await sporeParser.sporeInfoHandleTx(entityManager, tx);
           }
@@ -152,7 +157,8 @@ export class SyncService {
     if (this.confirmations === undefined) {
       return;
     }
-    if (!(await this.syncStatusRepo.initialized())) {
+    const inited = await this.syncStatusRepo.initialized();
+    if (!inited) {
       return;
     }
 
@@ -247,8 +253,86 @@ export class SyncService {
       );
     }
 
+    let deleteSporeCount = 0;
+    while (true) {
+      const spore = await this.sporeRepo.findOne({
+        where: {
+          updatedAtHeight: And(
+            LessThanOrEqual(formatSortableInt(confirmedHeight)),
+            MoreThan(formatSortableInt("-1")),
+          ),
+        },
+        order: {
+          updatedAtHeight: "DESC",
+        },
+      });
+      if (!spore) {
+        // No more confirmed data
+        break;
+      }
+
+      await withTransaction(
+        this.entityManager,
+        undefined,
+        async (entityManager) => {
+          const sporeRepo = new SporeRepo(entityManager);
+
+          // Delete all history data, and set the latest confirmed data as permanent data
+          const deleted = await sporeRepo.delete({
+            sporeId: spore.sporeId,
+            updatedAtHeight: LessThan(spore.updatedAtHeight),
+          });
+          deleteSporeCount += deleted.affected ?? 0;
+
+          await sporeRepo.update(
+            { id: spore.id },
+            { updatedAtHeight: formatSortableInt("-1") },
+          );
+        },
+      );
+    }
+
+    let deleteClusterCount = 0;
+    while (true) {
+      const cluster = await this.clusterRepo.findOne({
+        where: {
+          updatedAtHeight: And(
+            LessThanOrEqual(formatSortableInt(confirmedHeight)),
+            MoreThan(formatSortableInt("-1")),
+          ),
+        },
+        order: {
+          updatedAtHeight: "DESC",
+        },
+      });
+      if (!cluster) {
+        // No more confirmed data
+        break;
+      }
+
+      await withTransaction(
+        this.entityManager,
+        undefined,
+        async (entityManager) => {
+          const clusterRepo = new ClusterRepo(entityManager);
+
+          // Delete all history data, and set the latest confirmed data as permanent data
+          const deleted = await clusterRepo.delete({
+            clusterId: cluster.clusterId,
+            updatedAtHeight: LessThan(cluster.updatedAtHeight),
+          });
+          deleteSporeCount += deleted.affected ?? 0;
+
+          await clusterRepo.update(
+            { id: cluster.id },
+            { updatedAtHeight: formatSortableInt("-1") },
+          );
+        },
+      );
+    }
+
     this.logger.log(
-      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance`,
+      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster`,
     );
   }
 

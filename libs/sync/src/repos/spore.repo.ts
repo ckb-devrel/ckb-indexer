@@ -5,6 +5,6 @@ import { EntityManager, Repository } from "typeorm";
 @Injectable()
 export class SporeRepo extends Repository<Spore> {
   constructor(manager: EntityManager) {
-    super(SporeRepo, manager);
+    super(Spore, manager);
   }
 }

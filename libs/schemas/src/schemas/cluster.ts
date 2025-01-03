@@ -14,7 +14,7 @@ export class Cluster {
   id: number;
 
   @Column({ type: "varchar" })
-  @Index({ unique: true })
+  @Index()
   clusterId: string;
 
   @Column({ type: "text" })

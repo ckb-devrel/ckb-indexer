@@ -1,6 +1,6 @@
 import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
-import spore from "@ckb-ccc/spore";
+import { getClusterScriptInfos, getSporeScriptInfos } from "@ckb-ccc/spore";
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
@@ -146,9 +146,7 @@ export async function parseScriptMode(
   ) {
     return ScriptMode.Xudt;
   }
-  for (const clusterInfo of Object.values(
-    spore.getClusterScriptInfos(client),
-  )) {
+  for (const clusterInfo of Object.values(getClusterScriptInfos(client))) {
     if (
       script.codeHash === clusterInfo?.codeHash &&
       script.hashType === clusterInfo?.hashType
@@ -156,7 +154,7 @@ export async function parseScriptMode(
       return ScriptMode.Cluster;
     }
   }
-  for (const sporeInfo of Object.values(spore.getSporeScriptInfos(client))) {
+  for (const sporeInfo of Object.values(getSporeScriptInfos(client))) {
     if (
       script.codeHash === sporeInfo?.codeHash &&
       script.hashType === sporeInfo?.hashType
@@ -169,6 +167,7 @@ export async function parseScriptMode(
 
 export async function parseAddress(
   scriptLike: ccc.ScriptLike,
+  client: ccc.Client,
   rgbpp?: {
     btcRequester: AxiosInstance;
     rgbppBtcCodeHash: ccc.Hex;
@@ -215,5 +214,5 @@ export async function parseAddress(
     }
   }
 
-  return { address: ccc.Address.fromScript(script, this.client).toString() };
+  return { address: ccc.Address.fromScript(script, client).toString() };
 }

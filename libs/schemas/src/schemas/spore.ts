@@ -14,7 +14,7 @@ export class Spore {
   id: number;
 
   @Column({ type: "varchar" })
-  @Index({ unique: true })
+  @Index()
   sporeId: string;
 
   @Column({ type: "varchar", nullable: true })
