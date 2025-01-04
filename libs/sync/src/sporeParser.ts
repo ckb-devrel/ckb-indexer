@@ -264,7 +264,6 @@ class SporeParser {
           createTxHash: txHash,
         }),
         ownerAddress: transfer.to,
-        updateFromId: prevSpore?.id,
         updatedAtHeight: formatSortableInt(this.blockHeight),
         id:
           prevSpore?.updatedAtHeight === formatSortableInt(this.blockHeight)
@@ -293,7 +292,6 @@ class SporeParser {
           createTxHash: txHash,
         }),
         ownerAddress: undefined,
-        updateFromId: prevSpore?.id,
         updatedAtHeight: formatSortableInt(this.blockHeight),
         id:
           prevSpore?.updatedAtHeight === formatSortableInt(this.blockHeight)
@@ -353,7 +351,6 @@ class SporeParser {
           createTxHash: txHash,
         }),
         ownerAddress: transfer.to,
-        updateFromId: prevCluster?.id,
         updatedAtHeight: formatSortableInt(this.blockHeight),
         id:
           prevCluster?.updatedAtHeight === formatSortableInt(this.blockHeight)

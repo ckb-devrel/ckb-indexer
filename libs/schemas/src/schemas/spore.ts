@@ -38,9 +38,6 @@ export class Spore {
   @Column({ type: "varchar", nullable: true })
   ownerAddress?: string;
 
-  @Column({ type: "int", nullable: true })
-  updateFromId?: number;
-
   // To roll back on re-org
   @Column({ type: "varchar" })
   @Index()

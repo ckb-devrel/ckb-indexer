@@ -32,9 +32,6 @@ export class Cluster {
   @Column({ type: "varchar" })
   ownerAddress: string;
 
-  @Column({ type: "int", nullable: true })
-  updateFromId?: number;
-
   // To roll back on re-org
   @Column({ type: "varchar" })
   @Index()
