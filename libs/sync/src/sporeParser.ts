@@ -192,7 +192,7 @@ class SporeParser {
   }
 
   async parseSporeData(sporeId: ccc.Hex, data: ccc.Hex): Promise<SporeDetail> {
-    const sporeData = unpackToRawSporeData(ccc.bytesFrom(data));
+    const sporeData = unpackToRawSporeData(data);
     const decoded = {
       contentType: sporeData.contentType,
       content: ccc.hexFrom(sporeData.content),
@@ -213,7 +213,7 @@ class SporeParser {
   }
 
   parseClusterData(data: ccc.Hex): ClusterDetial {
-    return unpackToRawClusterData(ccc.bytesFrom(data));
+    return unpackToRawClusterData(data);
   }
 
   async handleSporeFlow(

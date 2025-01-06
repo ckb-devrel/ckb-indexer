@@ -20,7 +20,7 @@ export class Spore {
   @Column({ type: "varchar", nullable: true })
   clusterId?: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "mediumtext" })
   content: string;
 
   @Column({ type: "text" })
