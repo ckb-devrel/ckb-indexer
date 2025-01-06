@@ -152,18 +152,8 @@ export class CellService {
       return [];
     }
 
-    let lockScript: ccc.Script;
-    if (address.startsWith("ck")) {
-      lockScript = (await ccc.Address.fromString(address, this.client)).script;
-    } else {
-      const ckbAddress =
-        await this.udtBalanceRepo.getCkbAddressByBtcAddress(address);
-      if (!ckbAddress) {
-        return [];
-      }
-      lockScript = (await ccc.Address.fromString(ckbAddress, this.client))
-        .script;
-    }
+    const lockScript = (await ccc.Address.fromString(address, this.client))
+      .script;
     const typeScript: ccc.ScriptLike = {
       codeHash: udtInfo.typeCodeHash,
       hashType: udtInfo.typeCodeHash,

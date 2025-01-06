@@ -103,7 +103,7 @@ export class AssetService {
   async extractCellsFromTxInputs(tx: ccc.Transaction): Promise<
     {
       cell: ccc.Cell;
-      spenderTx: ccc.Hex;
+      spender?: ccc.OutPointLike;
     }[]
   > {
     const cells: ccc.Cell[] = [];
@@ -113,10 +113,13 @@ export class AssetService {
         cells.push(cell);
       }
     }
-    return cells.map((cell) => {
+    return cells.map((cell, index) => {
       return {
         cell,
-        spenderTx: tx.hash(),
+        spender: {
+          txHash: tx.hash(),
+          index,
+        },
       };
     });
   }

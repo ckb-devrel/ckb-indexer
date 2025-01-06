@@ -12,7 +12,7 @@ sync:
   threads: 8
   blockChunk: 100
   blockLimitPerInterval: 50000
-  blockSyncStart: 10228288
+  blockSyncStart: 10219182
 
   clearInterval: 1800000
   confirmations: 100

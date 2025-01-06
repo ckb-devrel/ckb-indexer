@@ -206,7 +206,7 @@ class SporeParser {
       );
       Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
     } catch (error) {
-      this.context.logger.error(`Spore DOB decode failed: ${error}`);
+      this.context.logger.error(`Spore ${sporeId} DOB decode failed: ${error}`);
     }
     return decoded;
   }
@@ -228,7 +228,7 @@ class SporeParser {
     if (mint) {
       if (prevSpore) {
         this.context.logger.error(
-          `Spore already exists when minting: ${sporeId}`,
+          `Spore already exists when minting ${sporeId}, at tx ${txHash}`,
         );
         await sporeRepo.delete(prevSpore);
       }
@@ -244,7 +244,7 @@ class SporeParser {
         });
         if (cluster === null) {
           this.context.logger.error(
-            `Cluster not found when minting spore: ${sporeId}`,
+            `Cluster not found when minting spore ${sporeId} at tx ${txHash}`,
           );
         } else {
           creatorAddress = cluster.ownerAddress;
@@ -265,13 +265,13 @@ class SporeParser {
     if (transfer) {
       if (prevSpore && prevSpore.ownerAddress !== transfer.from) {
         this.context.logger.error(
-          `Spore owner mismatch when transferring: ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${transfer.from}`,
+          `Spore owner mismatch when transferring ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${transfer.from}, at tx ${txHash}`,
         );
         await sporeRepo.delete(prevSpore);
       }
       if (!prevSpore) {
         this.context.logger.error(
-          `Spore not found when transferring: ${sporeId}`,
+          `Spore not found when transferring ${sporeId} at tx ${txHash}`,
         );
       }
       const spore = sporeRepo.create({
@@ -295,12 +295,14 @@ class SporeParser {
     if (burn) {
       if (prevSpore && prevSpore.ownerAddress !== burn.from) {
         this.context.logger.error(
-          `Spore owner mismatch when burning: ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${burn.from}`,
+          `Spore owner mismatch when burning ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${burn.from}, at tx ${txHash}`,
         );
         await sporeRepo.delete(prevSpore);
       }
       if (!prevSpore) {
-        this.context.logger.error(`Spore not found when burning: ${sporeId}`);
+        this.context.logger.error(
+          `Spore not found when burning ${sporeId} at tx ${txHash}`,
+        );
       }
       const spore = sporeRepo.create({
         ...(prevSpore ?? {
@@ -384,18 +386,31 @@ class SporeParser {
     }
   }
 
-  async sporeInfoHandleTx(entityManager: EntityManager, tx: ccc.Transaction) {
+  async analyzeTxFlow(tx: ccc.Transaction): Promise<{
+    sporeFlows: Record<string, Flow>;
+    clusterFlows: Record<string, Flow>;
+  }> {
     const sporeFlows = await this.analyzeFlow(tx, ScriptMode.Spore);
     const clusterFlows = await this.analyzeFlow(tx, ScriptMode.Cluster);
+    return { sporeFlows, clusterFlows };
+  }
 
-    withTransaction(
+  async handleFlows(
+    entityManager: EntityManager,
+    tx: ccc.Transaction,
+    flows: {
+      sporeFlows: Record<string, Flow>;
+      clusterFlows: Record<string, Flow>;
+    },
+  ) {
+    await withTransaction(
       this.context.entityManager,
       entityManager,
       async (entityManager) => {
         const sporeRepo = new SporeRepo(entityManager);
         const clusterRepo = new ClusterRepo(entityManager);
 
-        for (const [sporeId, flow] of Object.entries(sporeFlows)) {
+        for (const [sporeId, flow] of Object.entries(flows.sporeFlows)) {
           await this.handleSporeFlow(
             tx.hash(),
             ccc.hexFrom(sporeId),
@@ -405,7 +420,7 @@ class SporeParser {
           );
         }
 
-        for (const [clusterId, flow] of Object.entries(clusterFlows)) {
+        for (const [clusterId, flow] of Object.entries(flows.clusterFlows)) {
           await this.handleClusterFlow(
             tx.hash(),
             ccc.hexFrom(clusterId),

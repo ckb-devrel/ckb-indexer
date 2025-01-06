@@ -17,10 +17,7 @@ export class AssetController {
 
   async cellToTokenCell(params: {
     cell: ccc.Cell;
-    spender?: {
-      spenderTx: ccc.Hex;
-      spenderVout: number;
-    };
+    spender?: ccc.OutPointLike;
   }): Promise<TokenCell> {
     const { cell, spender } = params;
     const address = await this.service.scriptToAddress(cell.cellOutput.lock);
@@ -47,8 +44,8 @@ export class AssetController {
       capacity: ccc.numFrom(cell.cellOutput.capacity),
       data: cell.outputData,
       spent: spender !== undefined,
-      spenderTx: spender?.spenderTx,
-      inputIndex: spender?.spenderVout,
+      spenderTx: spender ? ccc.hexFrom(spender.txHash) : undefined,
+      inputIndex: spender ? Number(spender.index) : undefined,
       isomorphicBtcTx: btc ? ccc.hexFrom(btc.txId) : undefined,
       isomorphicBtcTxVout: btc ? btc.outIndex : undefined,
     };

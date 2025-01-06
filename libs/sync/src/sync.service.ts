@@ -223,6 +223,14 @@ export class SyncService {
           }),
         );
 
+        const txFlows = await Promise.all(
+          block.transactions.map(async (txLike) => {
+            const tx = ccc.Transaction.from(txLike);
+            const flows = await sporeParser.analyzeTxFlow(tx);
+            return { tx, flows };
+          }),
+        );
+
         await withTransaction(
           this.entityManager,
           undefined,
@@ -236,8 +244,8 @@ export class SyncService {
               timestamp: Number(block.header.timestamp / 1000n),
             });
 
-            for (const tx of block.transactions) {
-              await sporeParser.sporeInfoHandleTx(entityManager, tx);
+            for (const { tx, flows } of txFlows) {
+              await sporeParser.handleFlows(entityManager, tx, flows);
             }
 
             for (const { tx, diffs } of txDiffs) {
@@ -280,6 +288,9 @@ export class SyncService {
 
   async clear() {
     if (this.confirmations === undefined) {
+      return;
+    }
+    if (!(await this.syncStatusRepo.hasKeys([SYNC_KEY, PENDING_KEY]))) {
       return;
     }
 

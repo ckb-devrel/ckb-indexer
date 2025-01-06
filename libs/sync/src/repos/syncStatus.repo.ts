@@ -10,6 +10,16 @@ export class SyncStatusRepo extends Repository<SyncStatus> {
     super(SyncStatus, manager);
   }
 
+  async hasKeys(keys: Array<string>): Promise<boolean> {
+    for (const key of keys) {
+      const count = await this.countBy({ key });
+      if (count === 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   async syncHeight(
     key: string,
     defaultValue?: ccc.NumLike,
