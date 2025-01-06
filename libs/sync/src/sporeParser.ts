@@ -223,27 +223,25 @@ class SporeParser {
     clusterRepo: ClusterRepo,
   ) {
     const { asset, mint, transfer, burn } = flow;
-    const prevSpore = await sporeRepo.findOneBy({ sporeId });
+    const prevSpore = await sporeRepo.findOne({
+      where: { sporeId },
+      order: { updatedAtHeight: "DESC" },
+    });
 
     if (mint) {
       if (prevSpore) {
-        this.context.logger.error(
+        throw new Error(
           `Spore already exists when minting ${sporeId}, at tx ${txHash}`,
         );
-        await sporeRepo.delete(prevSpore);
       }
       let creatorAddress = mint.to;
       if (asset.spore?.clusterId !== undefined) {
         const cluster = await clusterRepo.findOne({
-          where: {
-            clusterId: asset.spore?.clusterId,
-          },
-          order: {
-            id: "DESC",
-          },
+          where: { clusterId: asset.spore?.clusterId },
+          order: { updatedAtHeight: "DESC" },
         });
         if (cluster === null) {
-          this.context.logger.error(
+          this.context.logger.warn(
             `Cluster not found when minting spore ${sporeId} at tx ${txHash}`,
           );
         } else {
@@ -264,13 +262,12 @@ class SporeParser {
 
     if (transfer) {
       if (prevSpore && prevSpore.ownerAddress !== transfer.from) {
-        this.context.logger.error(
+        throw new Error(
           `Spore owner mismatch when transferring ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${transfer.from}, at tx ${txHash}`,
         );
-        await sporeRepo.delete(prevSpore);
       }
       if (!prevSpore) {
-        this.context.logger.error(
+        this.context.logger.warn(
           `Spore not found when transferring ${sporeId} at tx ${txHash}`,
         );
       }
@@ -294,13 +291,12 @@ class SporeParser {
 
     if (burn) {
       if (prevSpore && prevSpore.ownerAddress !== burn.from) {
-        this.context.logger.error(
+        throw new Error(
           `Spore owner mismatch when burning ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${burn.from}, at tx ${txHash}`,
         );
-        await sporeRepo.delete(prevSpore);
       }
       if (!prevSpore) {
-        this.context.logger.error(
+        this.context.logger.warn(
           `Spore not found when burning ${sporeId} at tx ${txHash}`,
         );
       }
@@ -330,14 +326,14 @@ class SporeParser {
     clusterRepo: ClusterRepo,
   ) {
     const { asset, mint, transfer, burn } = flow;
-    const prevCluster = await clusterRepo.findOneBy({ clusterId });
+    const prevCluster = await clusterRepo.findOne({
+      where: { clusterId },
+      order: { updatedAtHeight: "DESC" },
+    });
 
     if (mint) {
       if (prevCluster) {
-        this.context.logger.error(
-          `Cluster already exists when minting: ${clusterId}`,
-        );
-        await clusterRepo.delete(prevCluster);
+        throw new Error(`Cluster already exists when minting: ${clusterId}`);
       }
       const cluster = clusterRepo.create({
         clusterId,
@@ -353,13 +349,12 @@ class SporeParser {
 
     if (transfer) {
       if (prevCluster && prevCluster.ownerAddress !== transfer.from) {
-        this.context.logger.error(
+        throw new Error(
           `Cluster owner mismatch when transferring: ${clusterId}, expected: ${prevCluster.ownerAddress}, actual: ${transfer.from}`,
         );
-        await clusterRepo.delete(prevCluster);
       }
       if (!prevCluster) {
-        this.context.logger.error(
+        this.context.logger.warn(
           `Cluster not found when transferring: ${clusterId}`,
         );
       }
@@ -382,7 +377,9 @@ class SporeParser {
     }
 
     if (burn) {
-      this.context.logger.error(`Cluster burn is not supported: ${clusterId}`);
+      throw new Error(
+        `Cluster burn is not supported: ${clusterId}, at tx ${txHash}`,
+      );
     }
   }
 
