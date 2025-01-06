@@ -62,7 +62,7 @@ export class AssetService {
     });
   }
 
-  async getTransactionByTxHash(txHash: string): Promise<
+  async getTransactionWithBlockByTxHash(txHash: string): Promise<
     | {
         tx: ccc.Transaction;
         blockHash?: ccc.Hex;

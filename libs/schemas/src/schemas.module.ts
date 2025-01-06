@@ -1,7 +1,14 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { Block, Cluster, Spore, SyncStatus, UdtBalance, UdtInfo } from "./schemas";
+import {
+  Block,
+  Cluster,
+  Spore,
+  SyncStatus,
+  UdtBalance,
+  UdtInfo,
+} from "./schemas";
 
 @Module({
   imports: [

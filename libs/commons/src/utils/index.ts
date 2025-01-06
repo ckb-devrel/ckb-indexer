@@ -65,6 +65,8 @@ export enum RpcError {
   CkbCellNotFound,
   RgbppCellNotFound,
   CellNotAsset,
+  ClusterNotFound,
+  SporeNotFound,
 }
 
 export const RpcErrorMessage: Record<RpcError, string> = {
@@ -74,6 +76,8 @@ export const RpcErrorMessage: Record<RpcError, string> = {
   [RpcError.CkbCellNotFound]: "Cell on ckb not found",
   [RpcError.RgbppCellNotFound]: "Rgbpp cell on ckb not found",
   [RpcError.CellNotAsset]: "Cell is not an asset",
+  [RpcError.ClusterNotFound]: "Cluster not found",
+  [RpcError.SporeNotFound]: "Spore not found",
 };
 
 export function assert<T>(
@@ -116,6 +120,18 @@ export function headerToRepoBlock(
   return block;
 }
 
+export async function parseScriptModeFromAddress(
+  address: string,
+  client: ccc.Client,
+): Promise<ScriptMode> {
+  if (address.startsWith("ck")) {
+    const ckbAddress = await ccc.Address.fromString(address, client);
+    return await parseScriptMode(ckbAddress.script, client);
+  } else {
+    return ScriptMode.Rgbpp;
+  }
+}
+
 export async function parseScriptMode(
   script: ccc.ScriptLike,
   client: ccc.Client,
@@ -130,21 +146,23 @@ export async function parseScriptMode(
   ) {
     return ScriptMode.Rgbpp;
   }
-  const singleUseLock = await client.getKnownScript(
-    ccc.KnownScript.SingleUseLock,
-  );
-  if (
-    script.codeHash === singleUseLock?.codeHash &&
-    script.hashType === singleUseLock?.hashType
-  ) {
-    return ScriptMode.SingleUseLock;
-  }
-  const xudtType = await client.getKnownScript(ccc.KnownScript.XUdt);
-  if (
-    script.codeHash === xudtType.codeHash &&
-    script.hashType === xudtType.hashType
-  ) {
-    return ScriptMode.Xudt;
+  const paris = {
+    [ccc.KnownScript.SingleUseLock]: ScriptMode.SingleUseLock,
+    [ccc.KnownScript.XUdt]: ScriptMode.Xudt,
+    [ccc.KnownScript.AnyoneCanPay]: ScriptMode.Acp,
+    [ccc.KnownScript.Secp256k1Blake160]: ScriptMode.Secp256k1,
+    [ccc.KnownScript.JoyId]: ScriptMode.JoyId,
+  };
+  for (const [knownScript, mode] of Object.entries(paris)) {
+    const expectedScript = await client.getKnownScript(
+      knownScript as ccc.KnownScript,
+    );
+    if (
+      script.codeHash === expectedScript.codeHash &&
+      script.hashType === expectedScript.hashType
+    ) {
+      return mode;
+    }
   }
   for (const clusterInfo of Object.values(getClusterScriptInfos(client))) {
     if (

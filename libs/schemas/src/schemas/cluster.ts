@@ -20,7 +20,7 @@ export class Cluster {
   @Column({ type: "text" })
   name: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "mediumtext" })
   description: string;
 
   @Column({ type: "varchar" })

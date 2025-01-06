@@ -59,7 +59,7 @@ export class SporeParserBuilder {
 interface SporeDetail {
   content: string;
   contentType: string;
-  clusterId?: ccc.Hex;
+  clusterId?: string;
   dobDecoded?: string;
 }
 
@@ -70,7 +70,7 @@ interface ClusterDetial {
 
 interface Flow {
   asset: {
-    script: ccc.Script;
+    ownerScript: ccc.Script;
     data: ccc.Hex;
     spore?: SporeDetail;
     cluster?: ClusterDetial;
@@ -125,7 +125,10 @@ class SporeParser {
       if (!cellOutput || !outputData || !cellOutput.type) {
         continue;
       }
-      const expectedMode = await parseScriptMode(cellOutput.type, this.context.client);
+      const expectedMode = await parseScriptMode(
+        cellOutput.type,
+        this.context.client,
+      );
       if (expectedMode !== mode) {
         continue;
       }
@@ -133,7 +136,7 @@ class SporeParser {
       const sporeOrClusterId = cellOutput.type.args;
       flows[sporeOrClusterId] = {
         asset: {
-          script: cellOutput.type,
+          ownerScript: cellOutput.lock,
           data: outputData,
         },
         burn: {
@@ -147,7 +150,10 @@ class SporeParser {
       if (!output.type) {
         continue;
       }
-      const expectedMode = await parseScriptMode(output.type, this.context.client);
+      const expectedMode = await parseScriptMode(
+        output.type,
+        this.context.client,
+      );
       if (expectedMode !== mode) {
         continue;
       }
@@ -165,7 +171,7 @@ class SporeParser {
       } else {
         flows[sporeOrClusterId] = {
           asset: {
-            script: output.type,
+            ownerScript: output.lock,
             data: tx.outputsData[index],
           },
           mint: {
@@ -221,6 +227,7 @@ class SporeParser {
     sporeId: ccc.Hex,
     flow: Flow,
     sporeRepo: SporeRepo,
+    clusterRepo: ClusterRepo,
   ) {
     const { asset, mint, transfer, burn } = flow;
     const prevSpore = await sporeRepo.findOneBy({ sporeId });
@@ -232,10 +239,28 @@ class SporeParser {
         );
         await sporeRepo.delete(prevSpore);
       }
+      let creatorAddress = mint.to;
+      if (asset.spore?.clusterId !== undefined) {
+        const cluster = await clusterRepo.findOne({
+          where: {
+            clusterId: asset.spore?.clusterId,
+          },
+          order: {
+            id: "DESC",
+          },
+        });
+        if (cluster === null) {
+          this.context.logger.error(
+            `Cluster not found when minting spore: ${sporeId}`,
+          );
+        } else {
+          creatorAddress = cluster.ownerAddress;
+        }
+      }
       const spore = sporeRepo.create({
         sporeId,
         ...asset.spore,
-        creatorAddress: mint.to,
+        creatorAddress,
         ownerAddress: mint.to,
         createTxHash: txHash,
         updatedAtHeight: formatSortableInt(this.blockHeight),
@@ -383,6 +408,7 @@ class SporeParser {
             ccc.hexFrom(sporeId),
             flow,
             sporeRepo,
+            clusterRepo,
           );
         }
 

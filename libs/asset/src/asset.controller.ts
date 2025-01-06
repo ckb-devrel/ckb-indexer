@@ -4,6 +4,7 @@ import {
   asyncMap,
   RpcError,
   TokenCell,
+  TxAssetCellData,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get } from "@nestjs/common";
@@ -15,9 +16,12 @@ export class AssetController {
 
   async cellToTokenCell(params: {
     cell: ccc.Cell;
-    spenderTx?: ccc.Hex;
+    spender?: {
+      spenderTx: ccc.Hex;
+      spenderVout: number;
+    };
   }): Promise<TokenCell> {
-    const { cell, spenderTx } = params;
+    const { cell, spender } = params;
     const { address, btc } = await this.service.scriptToAddress(
       cell.cellOutput.lock,
     );
@@ -36,8 +40,9 @@ export class AssetController {
       ownerAddress: address,
       capacity: ccc.numFrom(cell.cellOutput.capacity),
       data: cell.outputData,
-      spent: spenderTx !== undefined,
-      spenderTx,
+      spent: spender !== undefined,
+      spenderTx: spender?.spenderTx,
+      inputIndex: spender?.spenderVout,
       isomorphicBtcTx: btc ? ccc.hexFrom(btc.txId) : undefined,
       isomorphicBtcTxVout: btc ? btc.outIndex : undefined,
     };
@@ -92,10 +97,18 @@ export class AssetController {
     return assetTxData;
   }
 
+  async extractTxAssetFromTx(
+    tx: ccc.Transaction,
+    blockHash?: ccc.Hex,
+    blockNumber?: ccc.Num,
+  ): Promise<TxAssetCellData> {
+    throw new Error("Not implemented");
+  }
+
   @Get("/queryAssetTxDataByTxHash")
   async queryAssetTxDataByTxHash(txHash: string): Promise<AssetTxData> {
     const { tx, blockHash, blockNumber } = assert(
-      await this.service.getTransactionByTxHash(txHash),
+      await this.service.getTransactionWithBlockByTxHash(txHash),
       RpcError.TxNotFound,
     );
     return await this.extractTxDataFromTx(tx, blockHash, blockNumber);
@@ -119,5 +132,34 @@ export class AssetController {
       assetTxDataList.push(assetTxData);
     });
     return assetTxDataList;
+  }
+
+  @Get("/queryTxAssetCellDataByTxHash")
+  async queryTxAssetCellDataByTxHash(txHash: string): Promise<TxAssetCellData> {
+    const { tx, blockHash, blockNumber } = assert(
+      await this.service.getTransactionWithBlockByTxHash(txHash),
+      RpcError.TxNotFound,
+    );
+    return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
+  }
+
+  @Get("/queryTxAssetCellDataListByBlockHash")
+  async queryTxAssetCellDataListByBlockHash(
+    blockHash: string,
+  ): Promise<TxAssetCellData[]> {
+    const block = assert(
+      await this.service.getBlockByBlockHash(blockHash),
+      RpcError.BlockNotFound,
+    );
+    const txAssetCellDataList: TxAssetCellData[] = [];
+    await asyncMap(block.transactions, async (tx) => {
+      const txAssetCellData = await this.extractTxAssetFromTx(
+        tx,
+        block.header.hash,
+        block.header.number,
+      );
+      txAssetCellDataList.push(txAssetCellData);
+    });
+    return txAssetCellDataList;
   }
 }

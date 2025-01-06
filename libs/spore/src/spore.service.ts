@@ -1,8 +1,15 @@
-import { assertConfig, RgbppLockArgs } from "@app/commons";
+import {
+  assertConfig,
+  parseAddress,
+  parseScriptModeFromAddress,
+  ScriptMode,
+} from "@app/commons";
+import { Cluster, Spore } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
+import { ClusterRepo, SporeRepo } from "./repos";
 
 @Injectable()
 export class SporeService {
@@ -12,7 +19,11 @@ export class SporeService {
   private readonly rgbppBtcHashType: ccc.HashType;
   private readonly btcRequester: AxiosInstance;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly clusterRepo: ClusterRepo,
+    private readonly sporeRepo: SporeRepo,
+  ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
     this.client = isMainnet
@@ -39,124 +50,56 @@ export class SporeService {
       outIndex: number;
     };
   }> {
-    const script = ccc.Script.from(scriptLike);
-
-    if (
-      script.codeHash === this.rgbppBtcCodeHash &&
-      script.hashType === this.rgbppBtcHashType
-    ) {
-      const decoded = (() => {
-        try {
-          return RgbppLockArgs.decode(script.args);
-        } catch (err) {
-          this.logger.warn(
-            `Failed to decode rgbpp lock args ${script.args}: ${err.message}`,
-          );
-        }
-      })();
-
-      if (decoded) {
-        const { outIndex, txId } = decoded;
-        const { data } = await this.btcRequester.post("/", {
-          method: "getrawtransaction",
-          params: [txId.slice(2), true],
-        });
-
-        if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-          this.logger.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
-        } else {
-          return {
-            address: data?.result?.vout?.[outIndex]?.scriptPubKey?.address,
-            btc: decoded,
-          };
-        }
-      }
-    }
-
-    return { address: ccc.Address.fromScript(script, this.client).toString() };
+    return parseAddress(scriptLike, this.client, {
+      btcRequester: this.btcRequester,
+      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
+      rgbppBtcHashType: this.rgbppBtcHashType,
+    });
   }
 
-  async getCellByOutpoint(
-    txHash: ccc.HexLike,
-    index: number,
-  ): Promise<
-    | {
-        cell: ccc.Cell;
-        spentTx?: ccc.Hex;
-      }
-    | undefined
-  > {
-    const cell = await this.client.getCell({ txHash, index });
-    if (cell) {
-      const liveCell = await this.client.getCellLive({ txHash, index }, true);
-      if (liveCell) {
-        return {
-          cell: liveCell,
-        };
-      }
-      const spentTxs = this.client.findTransactions({
-        script: cell.cellOutput.lock,
-        scriptType: "lock",
-        scriptSearchMode: "exact",
-        filter: {
-          script: cell.cellOutput.type,
-        },
-      });
-      for await (const tx of spentTxs) {
-        if (tx.isInput) {
-          return {
-            cell,
-            spentTx: tx.txHash,
-          };
-        }
-      }
-    }
+  async getItemsCountOfCluster(clusterId: ccc.HexLike): Promise<number> {
+    return await this.sporeRepo.getSporeCountByClusterId(clusterId);
   }
 
-  async getRgbppCellByUtxo(
-    btcTxHash: string,
-    index: number,
-  ): Promise<
-    | {
-        cell: ccc.Cell;
-        spentTx?: ccc.Hex;
-      }
-    | undefined
-  > {
-    const encoded = RgbppLockArgs.encode({ txId: btcTxHash, outIndex: index });
-    const rgbppCells = this.client.findCellsByLock(
-      {
-        codeHash: this.rgbppBtcCodeHash,
-        hashType: this.rgbppBtcHashType,
-        args: encoded,
-      },
-      null,
-      true,
+  async getHoldersCountOfCluster(clusterId: ccc.HexLike): Promise<number> {
+    return await this.sporeRepo.getHolderCountByClusterId(clusterId);
+  }
+
+  async getCluster(clusterId: ccc.HexLike): Promise<Cluster | null> {
+    return await this.clusterRepo.getClusterById(clusterId);
+  }
+
+  async getClusterMode(ownerAddress: string): Promise<"public" | "private"> {
+    const scriptMode = await parseScriptModeFromAddress(
+      ownerAddress,
+      this.client,
     );
-    for await (const cell of rgbppCells) {
-      return { cell };
+    return scriptMode === ScriptMode.Secp256k1 ||
+      scriptMode === ScriptMode.JoyId ||
+      scriptMode === ScriptMode.Rgbpp
+      ? "private"
+      : "public";
+  }
+
+  async getBlockInfoFromTx(txHash: string): Promise<{
+    height: ccc.Num;
+    timestamp: number;
+  } | null> {
+    const tx = await this.client.getTransaction(txHash);
+    if (tx === undefined || tx.blockNumber === undefined) {
+      return null;
     }
-    const rgbppTxs = this.client.findTransactionsByLock(
-      {
-        codeHash: this.rgbppBtcCodeHash,
-        hashType: this.rgbppBtcHashType,
-        args: encoded,
-      },
-      null,
-      false,
-    );
-    let spentCell: ccc.Cell | undefined;
-    let spentTx: ccc.Hex | undefined;
-    for await (const tx of rgbppTxs) {
-      if (tx.isInput) {
-        spentTx = tx.txHash;
-      } else {
-        spentCell = await this.client.getCell({
-          txHash: tx.txHash,
-          index: tx.txIndex,
-        });
-      }
+    const header = await this.client.getHeaderByNumber(tx.blockNumber);
+    if (header === undefined) {
+      return null;
     }
-    return spentCell ? { cell: spentCell, spentTx } : undefined;
+    return {
+      height: header.number,
+      timestamp: Number(header.timestamp / 1000n),
+    };
+  }
+
+  async getSpore(sporeId: ccc.HexLike): Promise<Spore | null> {
+    return await this.sporeRepo.getSpore(sporeId);
   }
 }

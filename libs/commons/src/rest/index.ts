@@ -11,6 +11,9 @@ export enum ScriptMode {
   Xudt,
   Spore,
   Cluster,
+  Acp,
+  Secp256k1,
+  JoyId,
   Unknown,
 }
 
@@ -64,6 +67,7 @@ export interface TokenCell {
   data: ccc.Hex;
   spent: boolean;
   spenderTx?: ccc.Hex;
+  inputIndex?: number;
   isomorphicBtcTx?: ccc.Hex;
   isomorphicBtcTxVout?: number;
 }
@@ -95,16 +99,17 @@ export interface ClusterInfo {
   clusterType: "public" | "private";
   clusterId: ccc.Hex;
   owner: string;
-  itemsCount: ccc.Num;
-  holderCount: ccc.Num;
+  creator: string;
+  itemsCount: number;
+  holdersCount: number;
   issueChain: Chain;
   issueTxId: ccc.Hex;
   issueTxHeight: ccc.Num;
-  issueTime: ccc.Num;
+  issueTime: number;
   rgbppTag: boolean;
 }
 
-export interface NFTData {
+export interface SporeData {
   tokenId: ccc.Hex;
   clusterId: ccc.Hex;
   contentType: string;
@@ -113,16 +118,16 @@ export interface NFTData {
 
 export interface NFTInfo {
   tokenId: ccc.Hex;
-  clusterId: ccc.Hex;
+  clusterId?: ccc.Hex;
   protocol: "spore";
-  clusterInfo: ClusterInfo;
+  clusterInfo?: ClusterInfo;
   contentType: string;
   content: string;
   creator: string;
-  owner: string;
-  dobDetails: string;
+  owner?: string;
+  dobDetails?: string;
   createTxId: ccc.Hex;
-  createTime: ccc.Num;
+  createTime: number;
 }
 
 export interface AssetTxData {
@@ -131,7 +136,43 @@ export interface AssetTxData {
   blockHeight?: ccc.Num;
   tokenInfos: TokenData[];
   clusterInfos: ClusterData[];
-  sporeInfos: NFTData[];
+  sporeInfos: SporeData[];
   inputs: TokenCell[];
   outputs: TokenCell[];
+}
+
+export enum EventType {
+  Mint,
+  Transfer,
+  Burn,
+}
+
+export interface TxAssetCellData {
+  txId: ccc.Hex;
+  blockHash: ccc.Hex;
+  blockHeight: ccc.Num;
+  inputs: TxAssetCellDetail[];
+  outputs: TxAssetCellDetail[];
+}
+
+export interface TxAssetCellDetail {
+  index: number;
+  capacity: ccc.Num;
+  eventType: EventType;
+  address: string;
+  typeScriptType: ScriptMode;
+  tokenData?: TokenData;
+  nftData?: NftData;
+  isomorphicBtcTx?: ccc.Hex;
+  isomorphicBtcTxVout?: number;
+}
+
+export interface NftData {
+  tokenId: ccc.Hex;
+  contentType: string;
+  content: string;
+  clusterId: ccc.Hex;
+  clusterName: string;
+  clusterType: "public" | "private";
+  clusterDescription?: string;
 }

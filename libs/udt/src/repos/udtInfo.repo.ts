@@ -13,7 +13,14 @@ export class UdtInfoRepo extends Repository<UdtInfo> {
     tokenHash: ccc.HexLike,
   ): Promise<UdtInfo | undefined> {
     return (
-      (await this.findOneBy({ hash: ccc.hexFrom(tokenHash) })) ?? undefined
+      (await this.findOne({
+        where: {
+          hash: ccc.hexFrom(tokenHash),
+        },
+        order: {
+          id: "DESC",
+        },
+      })) ?? undefined
     );
   }
 }
