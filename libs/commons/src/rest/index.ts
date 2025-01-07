@@ -111,9 +111,9 @@ export interface ClusterInfo {
 
 export interface SporeData {
   tokenId: ccc.Hex;
-  clusterId: ccc.Hex;
   contentType: string;
   content: string;
+  clusterId?: ccc.Hex;
 }
 
 export interface NFTInfo {
@@ -144,13 +144,15 @@ export interface AssetTxData {
 export enum EventType {
   Mint,
   Transfer,
+  MintAndTransfer,
   Burn,
+  BurnAndTransfer,
 }
 
 export interface TxAssetCellData {
   txId: ccc.Hex;
-  blockHash: ccc.Hex;
-  blockHeight: ccc.Num;
+  blockHash?: ccc.Hex;
+  blockHeight?: ccc.Num;
   inputs: TxAssetCellDetail[];
   outputs: TxAssetCellDetail[];
 }
@@ -169,10 +171,8 @@ export interface TxAssetCellDetail {
 
 export interface NftData {
   tokenId: ccc.Hex;
-  contentType: string;
-  content: string;
-  clusterId: ccc.Hex;
-  clusterName: string;
-  clusterType: "public" | "private";
+  contentType?: string;
+  content?: string;
+  clusterName?: string;
   clusterDescription?: string;
 }

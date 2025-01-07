@@ -226,3 +226,21 @@ export async function parseAddress(
 
   return ckbAddress;
 }
+
+export function extractIsomorphicInfo(
+  rgbppScript: ccc.ScriptLike,
+): ccc.OutPointLike | undefined {
+  const decoded = (() => {
+    try {
+      return RgbppLockArgs.decode(rgbppScript.args);
+    } catch (err) {
+      return undefined;
+    }
+  })();
+  if (!decoded) {
+    return undefined;
+  }
+
+  const { outIndex, txId } = decoded;
+  return { txHash: txId, index: outIndex };
+}

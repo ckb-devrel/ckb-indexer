@@ -20,7 +20,7 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           addressHash,
           tokenHash: ccc.hexFrom(tokenHash),
         },
-        order: { id: "DESC" },
+        order: { updatedAtHeight: "DESC" },
         take: 1,
       });
     } else {

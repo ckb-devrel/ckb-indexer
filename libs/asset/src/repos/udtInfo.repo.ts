@@ -9,16 +9,14 @@ export class UdtInfoRepo extends Repository<UdtInfo> {
     super(UdtInfo, manager);
   }
 
-  async getTokenInfoByTokenId(
-    tokenHash: ccc.HexLike,
-  ): Promise<UdtInfo | undefined> {
+  async getTokenInfo(tokenHash: ccc.HexLike): Promise<UdtInfo | undefined> {
     return (
       (await this.findOne({
         where: {
           hash: ccc.hexFrom(tokenHash),
         },
         order: {
-          id: "DESC",
+          updatedAtHeight: "DESC",
         },
       })) ?? undefined
     );

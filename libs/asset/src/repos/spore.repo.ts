@@ -12,7 +12,7 @@ export class SporeRepo extends Repository<Spore> {
   async getSporeCountByClusterId(clusterId: ccc.HexLike): Promise<number> {
     return await this.manager
       .createQueryBuilder(Spore, "spore")
-      .select("max(id)")
+      .select("max(updatedAtHeight)")
       .where("spore.clusterId = :clusterId", {
         clusterId: ccc.hexFrom(clusterId),
       })
@@ -23,7 +23,7 @@ export class SporeRepo extends Repository<Spore> {
   async getHolderCountByClusterId(clusterId: ccc.HexLike): Promise<number> {
     return await this.manager
       .createQueryBuilder(Spore, "spore")
-      .select("max(id)")
+      .select("max(updatedAtHeight)")
       .where("spore.clusterId = :clusterId", {
         clusterId: ccc.hexFrom(clusterId),
       })

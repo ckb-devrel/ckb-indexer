@@ -9,7 +9,7 @@ mysql:
 
 sync:
   interval: 10000
-  threads: 8
+  threads: 3
   blockChunk: 100
   blockLimitPerInterval: 50000
   blockSyncStart: 10219182

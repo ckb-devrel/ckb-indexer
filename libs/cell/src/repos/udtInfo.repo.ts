@@ -18,7 +18,7 @@ export class UdtInfoRepo extends Repository<UdtInfo> {
           hash: ccc.hexFrom(tokenHash),
         },
         order: {
-          id: "DESC",
+          updatedAtHeight: "DESC",
         },
       })) ?? undefined
     );

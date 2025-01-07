@@ -9,7 +9,7 @@ export class ClusterRepo extends Repository<Cluster> {
     super(Cluster, manager);
   }
 
-  async getClusterById(clusterId: ccc.HexLike): Promise<Cluster | null> {
+  async getCluster(clusterId: ccc.HexLike): Promise<Cluster | null> {
     return await this.findOne({
       where: {
         clusterId: ccc.hexFrom(clusterId),

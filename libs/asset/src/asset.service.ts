@@ -4,12 +4,16 @@ import {
   parseScriptMode,
   ScriptMode,
 } from "@app/commons";
-import { UdtInfo } from "@app/schemas";
+import { Cluster, Spore, UdtInfo } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
+import {
+  unpackToRawClusterData,
+  unpackToRawSporeData,
+} from "@ckb-ccc/spore/advanced";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
-import { UdtInfoRepo } from "./repos";
+import { ClusterRepo, SporeRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class AssetService {
@@ -21,6 +25,8 @@ export class AssetService {
   constructor(
     private readonly configService: ConfigService,
     private readonly udtInfoRepo: UdtInfoRepo,
+    private readonly sporeRepo: SporeRepo,
+    private readonly clusterRepo: ClusterRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -162,15 +168,56 @@ export class AssetService {
       return;
     }
     const tokenHash = cell.cellOutput.type.hash();
-    const udtInfo = await this.udtInfoRepo.findOneBy({ hash: tokenHash });
-    if (udtInfo) {
-      return udtInfo;
-    } else {
-      return this.udtInfoRepo.create({
+    return (
+      (await this.udtInfoRepo.getTokenInfo(tokenHash)) ??
+      this.udtInfoRepo.create({
         hash: tokenHash,
         typeCodeHash: cell.cellOutput.type.codeHash,
         typeHashType: cell.cellOutput.type.hashType,
         typeArgs: cell.cellOutput.type.args,
+      })
+    );
+  }
+
+  async getClusterInfoFromCell(cell: ccc.Cell): Promise<Cluster | undefined> {
+    if (!cell.cellOutput.type) {
+      return;
+    }
+    const mode = await this.scriptMode(cell.cellOutput.type);
+    if (mode !== ScriptMode.Cluster) {
+      return;
+    }
+    const clusterId = cell.cellOutput.type.args;
+    return (
+      (await this.clusterRepo.getCluster(clusterId)) ??
+      this.clusterRepo.create({
+        clusterId,
+        ...unpackToRawClusterData(cell.outputData),
+      })
+    );
+  }
+
+  async getSporeInfoFromCell(cell: ccc.Cell): Promise<Spore | undefined> {
+    if (!cell.cellOutput.type) {
+      return;
+    }
+    const mode = await this.scriptMode(cell.cellOutput.type);
+    if (mode !== ScriptMode.Spore) {
+      return;
+    }
+    const sporeId = cell.cellOutput.type.args;
+    const spore = await this.sporeRepo.getSpore(sporeId);
+    if (spore) {
+      return spore;
+    } else {
+      const sporeData = unpackToRawSporeData(cell.outputData);
+      return this.sporeRepo.create({
+        sporeId,
+        contentType: sporeData.contentType,
+        content: ccc.hexFrom(sporeData.content),
+        clusterId: sporeData.clusterId
+          ? ccc.hexFrom(sporeData.clusterId)
+          : undefined,
       });
     }
   }

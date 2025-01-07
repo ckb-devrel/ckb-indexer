@@ -17,7 +17,7 @@ export class Cluster {
   @Index()
   clusterId: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "mediumtext" })
   name: string;
 
   @Column({ type: "mediumtext" })
