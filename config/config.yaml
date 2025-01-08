@@ -9,10 +9,10 @@ mysql:
 
 sync:
   interval: 10000
-  threads: 3
+  threads: 4
   blockChunk: 100
   blockLimitPerInterval: 50000
-  blockSyncStart: 10219182
+  blockSyncStart: 15803172
 
   clearInterval: 1800000
   confirmations: 100

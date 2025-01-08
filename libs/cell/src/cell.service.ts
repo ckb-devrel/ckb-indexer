@@ -63,7 +63,7 @@ export class CellService {
   ): Promise<
     | {
         cell: ccc.Cell;
-        spentTx?: ccc.Hex;
+        spender?: ccc.OutPoint;
       }
     | undefined
   > {
@@ -87,7 +87,10 @@ export class CellService {
         if (tx.isInput) {
           return {
             cell,
-            spentTx: tx.txHash,
+            spender: ccc.OutPoint.from({
+              txHash: tx.txHash,
+              index: tx.txIndex,
+            }),
           };
         }
       }
@@ -100,7 +103,7 @@ export class CellService {
   ): Promise<
     | {
         cell: ccc.Cell;
-        spentTx?: ccc.Hex;
+        spender?: ccc.OutPoint;
       }
     | undefined
   > {
@@ -127,10 +130,13 @@ export class CellService {
       false,
     );
     let spentCell: ccc.Cell | undefined;
-    let spentTx: ccc.Hex | undefined;
+    let spender: ccc.OutPoint | undefined;
     for await (const tx of rgbppTxs) {
       if (tx.isInput) {
-        spentTx = tx.txHash;
+        spender = ccc.OutPoint.from({
+          txHash: tx.txHash,
+          index: tx.txIndex,
+        });
       } else {
         spentCell = await this.client.getCell({
           txHash: tx.txHash,
@@ -138,7 +144,7 @@ export class CellService {
         });
       }
     }
-    return spentCell ? { cell: spentCell, spentTx } : undefined;
+    return spentCell ? { cell: spentCell, spender } : undefined;
   }
 
   async getPagedTokenCells(

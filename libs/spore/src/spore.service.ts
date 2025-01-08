@@ -1,9 +1,4 @@
-import {
-  assertConfig,
-  parseAddress,
-  parseScriptModeFromAddress,
-  ScriptMode,
-} from "@app/commons";
+import { assertConfig, parseAddress } from "@app/commons";
 import { Cluster, Spore } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
 import { Injectable, Logger } from "@nestjs/common";
@@ -61,18 +56,6 @@ export class SporeService {
 
   async getCluster(clusterId: ccc.HexLike): Promise<Cluster | null> {
     return await this.clusterRepo.getClusterById(clusterId);
-  }
-
-  async getClusterMode(ownerAddress: string): Promise<"public" | "private"> {
-    const scriptMode = await parseScriptModeFromAddress(
-      ownerAddress,
-      this.client,
-    );
-    return scriptMode === ScriptMode.Secp256k1 ||
-      scriptMode === ScriptMode.JoyId ||
-      scriptMode === ScriptMode.Rgbpp
-      ? "private"
-      : "public";
   }
 
   async getBlockInfoFromTx(txHash: string): Promise<{

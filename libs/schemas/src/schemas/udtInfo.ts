@@ -45,7 +45,7 @@ export class UdtInfo {
   @Column({ type: "text", nullable: true })
   icon: string | null;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: "mediumtext", nullable: true })
   owner: string | null;
 
   /* === Statistic fields === */

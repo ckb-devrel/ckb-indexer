@@ -1,130 +1,21 @@
 import {
   assert,
-  AssetTxData,
   asyncMap,
   EventType,
   extractIsomorphicInfo,
-  RgbppLockArgs,
   RpcError,
   ScriptMode,
-  TokenCell,
   TxAssetCellData,
   TxAssetCellDetail,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
+import { ApiOkResponse } from "@nestjs/swagger";
 import { AssetService } from "./asset.service";
 
 @Controller()
 export class AssetController {
   constructor(private readonly service: AssetService) {}
-
-  async cellToTokenCell(params: {
-    cell: ccc.Cell;
-    spender?: ccc.OutPointLike;
-  }): Promise<TokenCell> {
-    const { cell, spender } = params;
-    const address = await this.service.scriptToAddress(cell.cellOutput.lock);
-    const btc = (() => {
-      try {
-        return RgbppLockArgs.decode(cell.cellOutput.lock.args);
-      } catch (err) {
-        return undefined;
-      }
-    })();
-    const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
-    return {
-      txId: cell.outPoint.txHash,
-      vout: Number(cell.outPoint.index),
-      lockScript: {
-        ...cell.cellOutput.lock,
-        codeHashType: await this.service.scriptMode(cell.cellOutput.lock),
-      },
-      typeScript: {
-        ...typeScript,
-        codeHashType: await this.service.scriptMode(typeScript),
-      },
-      ownerAddress: address,
-      capacity: ccc.numFrom(cell.cellOutput.capacity),
-      data: cell.outputData,
-      spent: spender !== undefined,
-      spenderTx: spender ? ccc.hexFrom(spender.txHash) : undefined,
-      inputIndex: spender ? Number(spender.index) : undefined,
-      isomorphicBtcTx: btc ? ccc.hexFrom(btc.txId) : undefined,
-      isomorphicBtcTxVout: btc ? btc.outIndex : undefined,
-    };
-  }
-
-  async extractTxDataFromTx(
-    tx: ccc.Transaction,
-    blockHash?: ccc.Hex,
-    blockHeight?: ccc.Num,
-  ): Promise<AssetTxData> {
-    const assetTxData: AssetTxData = {
-      txId: tx.hash(),
-      blockHash,
-      blockHeight,
-      tokenInfos: [],
-      clusterInfos: [],
-      sporeInfos: [],
-      inputs: [],
-      outputs: [],
-    };
-    const cells: ccc.Cell[] = [];
-
-    const inputCells = await this.service.extractCellsFromTxInputs(tx);
-    for (const input of inputCells) {
-      cells.push(input.cell);
-      const tokenCell = await this.cellToTokenCell(input);
-      assetTxData.inputs.push(tokenCell);
-    }
-
-    const outputCells = await this.service.extractCellsFromTxOutputs(tx);
-    for (const output of outputCells) {
-      cells.push(output.cell);
-      const tokenCell = await this.cellToTokenCell(output);
-      assetTxData.outputs.push(tokenCell);
-    }
-
-    for (const cell of cells) {
-      // token data
-      const udtInfo = await this.service.getTokenInfoFromCell(cell);
-      if (udtInfo) {
-        assetTxData.tokenInfos.push({
-          tokenId: ccc.hexFrom(udtInfo.hash),
-          name: udtInfo.name ?? undefined,
-          symbol: udtInfo.symbol ?? undefined,
-          decimal: udtInfo.decimals ?? undefined,
-          owner: udtInfo.owner ?? undefined,
-        });
-      }
-
-      // cluster data
-      const clusterInfo = await this.service.getClusterInfoFromCell(cell);
-      if (clusterInfo) {
-        assetTxData.clusterInfos.push({
-          clusterId: ccc.hexFrom(clusterInfo.clusterId),
-          name: clusterInfo.name,
-          description: clusterInfo.description,
-        });
-      }
-
-      // spore data
-      const sporeInfo = await this.service.getSporeInfoFromCell(cell);
-      if (sporeInfo) {
-        assetTxData.sporeInfos.push({
-          tokenId: ccc.hexFrom(sporeInfo.sporeId),
-          content: sporeInfo.content,
-          contentType: sporeInfo.contentType,
-          clusterId: sporeInfo.clusterId
-            ? ccc.hexFrom(sporeInfo.clusterId)
-            : undefined,
-        });
-      }
-    }
-
-    return assetTxData;
-  }
 
   async extractCellAssetFromCell(
     cell: ccc.Cell,
@@ -150,30 +41,32 @@ export class AssetController {
         : undefined,
     };
 
-    const token = await this.service.getTokenInfoFromCell(cell);
+    const token = await this.service.getTokenFromCell(cell);
     if (token) {
+      const { tokenInfo, balance } = token;
       cellAsset.tokenData = {
-        tokenId: ccc.hexFrom(token.hash),
-        name: token.name ?? undefined,
-        symbol: token.symbol ?? undefined,
-        decimal: token.decimals ?? undefined,
-        owner: token.owner ?? undefined,
+        tokenId: ccc.hexFrom(tokenInfo.hash),
+        name: tokenInfo.name ?? undefined,
+        symbol: tokenInfo.symbol ?? undefined,
+        decimal: tokenInfo.decimals ?? undefined,
+        amount: balance,
       };
     }
 
     const cluster = await this.service.getClusterInfoFromCell(cell);
     if (cluster) {
       cellAsset.nftData = {
-        tokenId: ccc.hexFrom(cluster.clusterId),
+        clusterId: ccc.hexFrom(cluster.clusterId),
         clusterName: cluster.name,
         clusterDescription: cluster.description,
       };
     }
 
-    const spore = await this.service.getSporeInfoFromCell(cell);
+    const spore = await this.service.getSporeFromCell(cell);
     if (spore) {
       cellAsset.nftData = {
         tokenId: ccc.hexFrom(spore.sporeId),
+        clusterId: spore.clusterId ? ccc.hexFrom(spore.clusterId) : undefined,
         content: spore.content,
         contentType: spore.contentType,
       };
@@ -195,6 +88,20 @@ export class AssetController {
       outputs: [],
     };
 
+    const tokenGroups: Record<
+      ccc.Hex,
+      {
+        input: {
+          totalBalance: ccc.Num;
+          indices: Array<number>;
+        };
+        output: {
+          totalBalance: ccc.Num;
+          indices: Array<number>;
+        };
+      }
+    > = {};
+
     const inputCells = await this.service.extractCellsFromTxInputs(tx);
     for (const [index, input] of inputCells.entries()) {
       const cellAsset = await this.extractCellAssetFromCell(
@@ -202,6 +109,24 @@ export class AssetController {
         index,
         EventType.Burn,
       );
+      if (cellAsset.tokenData) {
+        const tokenId = cellAsset.tokenData.tokenId;
+        if (tokenGroups[tokenId]) {
+          tokenGroups[tokenId].input.totalBalance += cellAsset.tokenData.amount;
+          tokenGroups[tokenId].input.indices.push(index);
+        } else {
+          tokenGroups[tokenId] = {
+            input: {
+              totalBalance: cellAsset.tokenData.amount,
+              indices: [index],
+            },
+            output: {
+              totalBalance: ccc.numFrom(0),
+              indices: [],
+            },
+          };
+        }
+      }
       txAssetData.inputs.push(cellAsset);
     }
 
@@ -212,45 +137,89 @@ export class AssetController {
         index,
         EventType.Mint,
       );
-      txAssetData.inputs.push(cellAsset);
+      if (cellAsset.nftData) {
+        const nftIndex = txAssetData.inputs.findIndex(
+          (input) =>
+            input.nftData?.tokenId === cellAsset.nftData?.tokenId ||
+            input.nftData?.clusterId === cellAsset.nftData?.clusterId,
+        );
+        if (nftIndex >= 0) {
+          txAssetData.inputs[nftIndex].eventType = EventType.Transfer;
+          cellAsset.eventType = EventType.Transfer;
+        }
+      }
+      if (cellAsset.tokenData) {
+        const tokenId = cellAsset.tokenData.tokenId;
+        if (tokenGroups[tokenId]) {
+          tokenGroups[tokenId].output.totalBalance +=
+            cellAsset.tokenData.amount;
+          tokenGroups[tokenId].output.indices.push(index);
+        } else {
+          tokenGroups[tokenId] = {
+            input: {
+              totalBalance: ccc.numFrom(0),
+              indices: [],
+            },
+            output: {
+              totalBalance: cellAsset.tokenData.amount,
+              indices: [index],
+            },
+          };
+        }
+      }
+      txAssetData.outputs.push(cellAsset);
     }
 
-    // TODO: rebalance event types
+    for (const group of Object.values(tokenGroups)) {
+      if (group.input.totalBalance === 0n || group.output.totalBalance === 0n) {
+        continue;
+      }
+      if (group.input.totalBalance > group.output.totalBalance) {
+        group.input.indices.forEach(
+          (index) =>
+            (txAssetData.inputs[index].eventType = EventType.BurnAndTransfer),
+        );
+        group.output.indices.forEach(
+          (index) =>
+            (txAssetData.outputs[index].eventType = EventType.BurnAndTransfer),
+        );
+        continue;
+      }
+      if (group.input.totalBalance === group.output.totalBalance) {
+        group.input.indices.forEach(
+          (index) => (txAssetData.inputs[index].eventType = EventType.Transfer),
+        );
+        group.output.indices.forEach(
+          (index) =>
+            (txAssetData.outputs[index].eventType = EventType.Transfer),
+        );
+        continue;
+      }
+      if (group.input.totalBalance < group.output.totalBalance) {
+        group.input.indices.forEach(
+          (index) =>
+            (txAssetData.inputs[index].eventType = EventType.MintAndTransfer),
+        );
+        group.output.indices.forEach(
+          (index) =>
+            (txAssetData.outputs[index].eventType = EventType.MintAndTransfer),
+        );
+        continue;
+      }
+    }
 
     return txAssetData;
   }
 
-  @Get("/queryAssetTxDataByTxHash")
-  async queryAssetTxDataByTxHash(txHash: string): Promise<AssetTxData> {
-    const { tx, blockHash, blockNumber } = assert(
-      await this.service.getTransactionWithBlockByTxHash(txHash),
-      RpcError.TxNotFound,
-    );
-    return await this.extractTxDataFromTx(tx, blockHash, blockNumber);
-  }
-
-  @Get("/queryAssetTxDataListByBlockHash")
-  async queryAssetTxDataListByBlockHash(
-    blockHash: string,
-  ): Promise<AssetTxData[]> {
-    const block = assert(
-      await this.service.getBlockByBlockHash(blockHash),
-      RpcError.BlockNotFound,
-    );
-    const assetTxDataList: AssetTxData[] = [];
-    await asyncMap(block.transactions, async (tx) => {
-      const assetTxData = await this.extractTxDataFromTx(
-        tx,
-        block.header.hash,
-        block.header.number,
-      );
-      assetTxDataList.push(assetTxData);
-    });
-    return assetTxDataList;
-  }
-
+  @ApiOkResponse({
+    type: TxAssetCellData,
+    description:
+      "Query a list of assets in the cell from a transaction by TxHash",
+  })
   @Get("/queryTxAssetCellDataByTxHash")
-  async queryTxAssetCellDataByTxHash(txHash: string): Promise<TxAssetCellData> {
+  async queryTxAssetCellDataByTxHash(
+    @Param("txHash") txHash: string,
+  ): Promise<TxAssetCellData> {
     const { tx, blockHash, blockNumber } = assert(
       await this.service.getTransactionWithBlockByTxHash(txHash),
       RpcError.TxNotFound,
@@ -258,9 +227,13 @@ export class AssetController {
     return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
   }
 
+  @ApiOkResponse({
+    type: TxAssetCellData,
+    description: "Query a list of assets in the cell from a block by BlockHash",
+  })
   @Get("/queryTxAssetCellDataListByBlockHash")
   async queryTxAssetCellDataListByBlockHash(
-    blockHash: string,
+    @Param("blockHash") blockHash: string,
   ): Promise<TxAssetCellData[]> {
     const block = assert(
       await this.service.getBlockByBlockHash(blockHash),

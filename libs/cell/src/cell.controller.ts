@@ -3,10 +3,12 @@ import {
   asyncMap,
   RgbppLockArgs,
   RpcError,
+  ScriptMode,
   TokenCell,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
+import { ApiOkResponse } from "@nestjs/swagger";
 import { CellService } from "./cell.service";
 
 @Controller()
@@ -15,7 +17,7 @@ export class CellController {
 
   async cellToTokenCell(
     cell: ccc.Cell,
-    spenderTx?: ccc.Hex,
+    spender?: ccc.OutPoint,
   ): Promise<TokenCell> {
     const address = await this.service.scriptToAddress(cell.cellOutput.lock);
     const btc = (() => {
@@ -26,6 +28,7 @@ export class CellController {
       }
     })();
     const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
+    const typeScriptType = await this.service.scriptMode(typeScript);
     return {
       txId: cell.outPoint.txHash,
       vout: Number(cell.outPoint.index),
@@ -35,47 +38,67 @@ export class CellController {
       },
       typeScript: {
         ...typeScript,
-        codeHashType: await this.service.scriptMode(typeScript),
+        codeHashType: typeScriptType,
       },
       ownerAddress: address,
       capacity: ccc.numFrom(cell.cellOutput.capacity),
       data: cell.outputData,
-      spent: spenderTx !== undefined,
-      spenderTx,
+      tokenAmount:
+        typeScriptType === ScriptMode.Xudt
+          ? ccc.udtBalanceFrom(cell.outputData)
+          : undefined,
+      spent: spender !== undefined,
+      spenderTx: spender ? spender.txHash : undefined,
+      inputIndex: spender ? Number(spender.index) : undefined,
       isomorphicBtcTx: btc ? ccc.hexFrom(btc.txId) : undefined,
       isomorphicBtcTxVout: btc ? btc.outIndex : undefined,
     };
   }
 
+  @ApiOkResponse({
+    type: TokenCell,
+    description: "Get an on-chain cell by CKB OutPoint",
+  })
   @Get("/getCellByOutpoint")
-  async getCellByOutpoint(txHash: string, index: number): Promise<TokenCell> {
-    const { cell, spentTx } = assert(
+  async getCellByOutpoint(
+    @Param("txHash") txHash: string,
+    @Param("index") index: number,
+  ): Promise<TokenCell> {
+    const { cell, spender } = assert(
       await this.service.getCellByOutpoint(txHash, index),
       RpcError.CkbCellNotFound,
     );
     assert(cell.cellOutput.type, RpcError.CellNotAsset);
-    return await this.cellToTokenCell(cell, spentTx);
+    return await this.cellToTokenCell(cell, spender);
   }
 
+  @ApiOkResponse({
+    type: TokenCell,
+    description: "Get an on-chain cell by isomorphic UTXO",
+  })
   @Get("/getIsomorphicCellByUtxo")
   async getIsomorphicCellByUtxo(
-    btcTxHash: string,
-    index: number,
+    @Param("btcTxHash") btcTxHash: string,
+    @Param("index") index: number,
   ): Promise<TokenCell> {
-    const { cell, spentTx } = assert(
+    const { cell, spender } = assert(
       await this.service.getRgbppCellByUtxo(btcTxHash, index),
       RpcError.RgbppCellNotFound,
     );
     assert(cell.cellOutput.type, RpcError.CellNotAsset);
-    return await this.cellToTokenCell(cell, spentTx);
+    return await this.cellToTokenCell(cell, spender);
   }
 
+  @ApiOkResponse({
+    type: [TokenCell],
+    description: "Get paged tokens under a user CKB address",
+  })
   @Get("/getUserTokenCells")
   async getUserTokenCells(
-    tokenId: string,
-    address: string,
-    offset: number,
-    limit: number,
+    @Param("tokenId") tokenId: string,
+    @Param("address") address: string,
+    @Param("offset") offset: number,
+    @Param("limit") limit: number,
   ): Promise<TokenCell[]> {
     const pagedCells = await this.service.getPagedTokenCells(
       tokenId,

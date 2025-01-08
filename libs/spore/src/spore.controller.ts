@@ -1,16 +1,21 @@
 import { assert, Chain, ClusterInfo, NFTInfo, RpcError } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
+import { ApiOkResponse } from "@nestjs/swagger";
 import { SporeService } from "./spore.service";
 
 @Controller()
 export class SporeController {
   constructor(private readonly service: SporeService) {}
 
+  @ApiOkResponse({
+    type: ClusterInfo,
+    description: "Get an on-chain cluster by the clusterId",
+  })
   @Get("/getSporeClusterById")
   async getSporeClusterById(
-    clusterId: string,
-    withDesc: boolean,
+    @Param("clusterId") clusterId: string,
+    @Param("withDesc") withDesc: boolean,
   ): Promise<ClusterInfo> {
     const cluster = assert(
       await this.service.getCluster(clusterId),
@@ -18,7 +23,6 @@ export class SporeController {
     );
     const itemsCount = await this.service.getItemsCountOfCluster(clusterId);
     const holdersCount = await this.service.getHoldersCountOfCluster(clusterId);
-    const clusterType = await this.service.getClusterMode(cluster.ownerAddress);
     const { height, timestamp } = assert(
       await this.service.getBlockInfoFromTx(cluster.createTxHash),
       RpcError.TxNotFound,
@@ -32,7 +36,6 @@ export class SporeController {
       holdersCount,
       owner: cluster.ownerAddress,
       creator: cluster.creatorAddress,
-      clusterType,
       issueTxHeight: height,
       issueTxId: ccc.hexFrom(cluster.createTxHash),
       issueTime: timestamp,
@@ -41,10 +44,14 @@ export class SporeController {
     };
   }
 
+  @ApiOkResponse({
+    type: NFTInfo,
+    description: "Get an on-chain spore by the sporeId",
+  })
   @Get("/getSporeById")
   async getSporeById(
-    sporeId: string,
-    withClusterDesc: boolean,
+    @Param("sporeId") sporeId: string,
+    @Param("withClusterDesc") withClusterDesc: boolean,
   ): Promise<NFTInfo> {
     const spore = assert(
       await this.service.getSpore(sporeId),
@@ -60,7 +67,6 @@ export class SporeController {
       clusterInfo: spore.clusterId
         ? await this.getSporeClusterById(spore.clusterId, withClusterDesc)
         : undefined,
-      protocol: "spore",
       contentType: spore.contentType,
       content: spore.content,
       creator: spore.creatorAddress,

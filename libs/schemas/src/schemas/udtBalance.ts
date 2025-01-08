@@ -26,7 +26,7 @@ export class UdtBalance {
   @Index()
   updatedAtHeight: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "mediumtext" })
   address: string;
 
   /* === Statistic fields === */

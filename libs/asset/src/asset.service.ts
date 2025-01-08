@@ -159,7 +159,13 @@ export class AssetService {
     );
   }
 
-  async getTokenInfoFromCell(cell: ccc.Cell): Promise<UdtInfo | undefined> {
+  async getTokenFromCell(cell: ccc.Cell): Promise<
+    | {
+        tokenInfo: UdtInfo;
+        balance: ccc.Num;
+      }
+    | undefined
+  > {
     if (!cell.cellOutput.type) {
       return;
     }
@@ -168,15 +174,19 @@ export class AssetService {
       return;
     }
     const tokenHash = cell.cellOutput.type.hash();
-    return (
+    const tokenInfo =
       (await this.udtInfoRepo.getTokenInfo(tokenHash)) ??
       this.udtInfoRepo.create({
         hash: tokenHash,
         typeCodeHash: cell.cellOutput.type.codeHash,
         typeHashType: cell.cellOutput.type.hashType,
         typeArgs: cell.cellOutput.type.args,
-      })
-    );
+      });
+    const tokenAmount = ccc.udtBalanceFrom(cell.outputData);
+    return {
+      tokenInfo,
+      balance: tokenAmount,
+    };
   }
 
   async getClusterInfoFromCell(cell: ccc.Cell): Promise<Cluster | undefined> {
@@ -197,7 +207,7 @@ export class AssetService {
     );
   }
 
-  async getSporeInfoFromCell(cell: ccc.Cell): Promise<Spore | undefined> {
+  async getSporeFromCell(cell: ccc.Cell): Promise<Spore | undefined> {
     if (!cell.cellOutput.type) {
       return;
     }

@@ -1,12 +1,17 @@
 import { assert, parseSortableInt, RpcError, TrackerInfo } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
 import { Controller, Get } from "@nestjs/common";
+import { ApiOkResponse } from "@nestjs/swagger";
 import { SyncService } from "./sync.service";
 
 @Controller()
 export class SyncController {
   constructor(private readonly service: SyncService) {}
 
+  @ApiOkResponse({
+    type: TrackerInfo,
+    description: "Get current tracker running status quo",
+  })
   @Get("/getTrackerInfo")
   async getTrackerInfo(): Promise<TrackerInfo> {
     const dbTip = assert(

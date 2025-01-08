@@ -11,7 +11,8 @@ import {
 } from "@app/commons";
 import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/core";
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
+import { ApiOkResponse } from "@nestjs/swagger";
 import { UdtService } from "./udt.service";
 
 @Controller()
@@ -35,11 +36,12 @@ export class UdtController {
     };
   }
 
+  @ApiOkResponse({
+    type: TokenInfo,
+    description: "Get the information of a token by the tokenId",
+  })
   @Get("/getTokenInfo")
-  async getTokenInfo(
-    @Query()
-    tokenId: string,
-  ): Promise<TokenInfo> {
+  async getTokenInfo(@Param("tokenId") tokenId: string): Promise<TokenInfo> {
     const { udtInfo, tx, block } = assert(
       await this.service.getTokenInfo(tokenId, true),
       RpcError.TokenNotFound,
@@ -73,17 +75,28 @@ export class UdtController {
     };
   }
 
+  @ApiOkResponse({
+    type: [TokenBalance],
+    description:
+      "Get detailed token balances of an address, filtered by tokenId if provided",
+  })
   @Get("/getTokenBalances")
   async getTokenBalances(
-    address: string,
-    tokenId?: string,
+    @Param("address") address: string,
+    @Param("tokenId") tokenId?: string,
   ): Promise<TokenBalance[]> {
     const udtBalances = await this.service.getTokenBalance(address, tokenId);
     return await asyncMap(udtBalances, this.udtBalanceToTokenBalance);
   }
 
+  @ApiOkResponse({
+    type: [TokenBalance],
+    description: "Filter all token holders by tokenId",
+  })
   @Get("/getTokenHolders")
-  async getTokenHolders(tokenId: string): Promise<TokenBalance[]> {
+  async getTokenHolders(
+    @Param("tokenId") tokenId: string,
+  ): Promise<TokenBalance[]> {
     const udtBalances = await this.service.getTokenAllBalances(tokenId);
     return await asyncMap(udtBalances, this.udtBalanceToTokenBalance);
   }

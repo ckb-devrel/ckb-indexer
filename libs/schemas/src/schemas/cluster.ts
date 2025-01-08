@@ -26,10 +26,10 @@ export class Cluster {
   @Column({ type: "varchar" })
   createTxHash: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "mediumtext" })
   creatorAddress: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "mediumtext" })
   ownerAddress: string;
 
   // To roll back on re-org
