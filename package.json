@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build": "nest build; tsc --outDir dist/workers workers/*.ts",
+    "build": "nest build; tsc -m node16 --outDir dist/workers workers/*.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"libs/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -17,8 +17,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@ckb-ccc/core": "^1.2.2",
-    "@ckb-ccc/spore": "^1.0.7",
+    "@ckb-ccc/shell": "^1.1.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.0.0",

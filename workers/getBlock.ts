@@ -1,4 +1,4 @@
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { parentPort, workerData } from "worker_threads";
 
 // get block in range (start, end]
@@ -55,7 +55,8 @@ export async function* getBlocks(
   }
 }
 
-const { isMainnet, rpcUri, rpcTimeout, maxConcurrent } = workerData;
+const { isMainnet, rpcUri, ssriServerUri, rpcTimeout, maxConcurrent } =
+  workerData;
 const client = isMainnet
   ? new ccc.ClientPublicMainnet({
       url: rpcUri,
@@ -67,12 +68,89 @@ const client = isMainnet
       maxConcurrent,
       timeout: rpcTimeout,
     });
+const executor = ssriServerUri
+  ? new ccc.ssri.ExecutorJsonRpc(ssriServerUri, {
+      maxConcurrent,
+      timeout: rpcTimeout,
+    })
+  : undefined;
+
+class Trait extends ccc.ssri.Trait {
+  constructor(outPoint: ccc.OutPointLike, executor?: ccc.ssri.Executor) {
+    super(outPoint, executor);
+  }
+}
 
 parentPort?.addListener("message", ({ start, end }) =>
   (async () => {
     const blocks = [];
     for await (const block of getBlocks(client, start, end)) {
-      blocks.push(block);
+      const scriptCodes: {
+        outPoint: ccc.OutPointLike;
+        size: number;
+        dataHash: ccc.Hex;
+        typeHash?: ccc.Hex;
+        isSsri: boolean;
+        isSsriUdt: boolean;
+      }[] = [];
+      for (const tx of block.block?.transactions ?? []) {
+        await Promise.all(
+          tx.outputs.map(async (output, i) => {
+            const data = tx.outputsData[i];
+            // ELF magic number is ".ELF" => 0x7f454c46
+            // ELF header has at least 64bytes
+            if (!data || !data.startsWith("0x7f454c46") || data.length <= 130) {
+              return;
+            }
+
+            const outPoint = {
+              txHash: tx.hash(),
+              index: i,
+            };
+
+            const trait = new Trait(outPoint, executor);
+            let isSsri = false;
+            let isSsriUdt = false;
+            try {
+              await trait.version();
+              isSsri = true;
+            } catch (err) {
+              if (!(err instanceof ccc.ssri.ExecutorErrorExecutionFailed)) {
+                throw err;
+              }
+            }
+            if (isSsri) {
+              try {
+                const { res } = await trait.hasMethods([
+                  "UDT.name",
+                  "UDT.symbol",
+                  "UDT.decimals",
+                  "UDT.icon",
+                ]);
+                isSsriUdt = res.some((v) => v);
+              } catch (err) {
+                if (!(err instanceof ccc.ssri.ExecutorErrorExecutionFailed)) {
+                  throw err;
+                }
+              }
+            }
+
+            scriptCodes.push({
+              outPoint: {
+                txHash: tx.hash(),
+                index: i,
+              },
+              size: data.length,
+              dataHash: ccc.hashCkb(data),
+              typeHash: output.type?.hash(),
+              isSsri,
+              isSsriUdt,
+            });
+          }),
+        );
+      }
+
+      blocks.push({ ...block, scriptCodes });
     }
     parentPort?.postMessage(blocks);
   })().catch((err) => {

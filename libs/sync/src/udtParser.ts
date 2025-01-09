@@ -6,7 +6,7 @@ import {
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";

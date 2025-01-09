@@ -8,12 +8,9 @@ importers:
 
   .:
     dependencies:
-      '@ckb-ccc/core':
-        specifier: ^1.2.2
-        version: 1.2.2(typescript@5.7.2)
-      '@ckb-ccc/spore':
-        specifier: ^1.0.7
-        version: 1.0.7(typescript@5.7.2)
+      '@ckb-ccc/shell':
+        specifier: ^1.1.0
+        version: 1.1.0(typescript@5.7.2)
       '@nestjs/common':
         specifier: ^10.0.0
         version: 10.4.15(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -324,11 +321,20 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
-  '@ckb-ccc/core@1.2.2':
-    resolution: {integrity: sha512-WpRsH7heZYrBYkHespOq5OWEhRlBMiBPx2JilhgMqVDKGy1i8ol3fkzPVRTrG9iYwTNYLn/9XBvi9iL4zbLQlw==}
+  '@ckb-ccc/core@1.3.0':
+    resolution: {integrity: sha512-XV1lgV+nMyi0vLQ92+xI/hIQpCssNP5I2VSIFgf9l7w+8PLcbUh9IC3ICV3snUYwIhCB2Y4dvRLW7NnkFBveRw==}
 
-  '@ckb-ccc/spore@1.0.7':
-    resolution: {integrity: sha512-xiiQ1Y0srxtyhoXHMvPvU3UksfrCT1MPSLuxfrU9UHNfr9L5d3yQuQUsgszwUiQc4nFlULC66tTY2ULV2LIOeQ==}
+  '@ckb-ccc/shell@1.1.0':
+    resolution: {integrity: sha512-2J+1bqhEYPs0r/nohZvr6pz2A8XRhjhROXFbH1VzCGaZZips2dDvHNbT80t3Tc7LXFW0stVCE2/EQ+UUpTEOTg==}
+
+  '@ckb-ccc/spore@1.1.0':
+    resolution: {integrity: sha512-4sPlPBRkriXRHYpveT3VgTmuX72GpnGbdk6ZH+7TEQB6vf6yOzTy11ZJRMjHMyr4t/XDHLFgS264R+eb9OoGOg==}
+
+  '@ckb-ccc/ssri@0.1.0':
+    resolution: {integrity: sha512-2gw70s8BzOvBHAObctC5TJOY28E5bks6H3A7Fw/ip65w39H8TuKBo9zgQ2A/mPWUlggXluw4x3DlZtxIj7EpjA==}
+
+  '@ckb-ccc/udt@0.1.0':
+    resolution: {integrity: sha512-tRIJlJcp1cm/mJ8Cnf7Z2B0H0GydzAqBrUszcsHXG7iBFcQpmJ8fqq07yWNS8VkemtBzA0Aqxixq9U4hM3WvrA==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -3553,7 +3559,7 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
-  '@ckb-ccc/core@1.2.2(typescript@5.7.2)':
+  '@ckb-ccc/core@1.3.0(typescript@5.7.2)':
     dependencies:
       '@joyid/ckb': 1.1.0(typescript@5.7.2)
       '@noble/ciphers': 0.5.3
@@ -3575,13 +3581,48 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@ckb-ccc/spore@1.0.7(typescript@5.7.2)':
+  '@ckb-ccc/shell@1.1.0(typescript@5.7.2)':
     dependencies:
-      '@ckb-ccc/core': 1.2.2(typescript@5.7.2)
+      '@ckb-ccc/core': 1.3.0(typescript@5.7.2)
+      '@ckb-ccc/spore': 1.1.0(typescript@5.7.2)
+      '@ckb-ccc/ssri': 0.1.0(typescript@5.7.2)
+      '@ckb-ccc/udt': 0.1.0(typescript@5.7.2)
+    transitivePeerDependencies:
+      - bufferutil
+      - debug
+      - encoding
+      - typescript
+      - utf-8-validate
+      - zod
+
+  '@ckb-ccc/spore@1.1.0(typescript@5.7.2)':
+    dependencies:
+      '@ckb-ccc/core': 1.3.0(typescript@5.7.2)
       axios: 1.7.9
     transitivePeerDependencies:
       - bufferutil
       - debug
+      - encoding
+      - typescript
+      - utf-8-validate
+      - zod
+
+  '@ckb-ccc/ssri@0.1.0(typescript@5.7.2)':
+    dependencies:
+      '@ckb-ccc/core': 1.3.0(typescript@5.7.2)
+    transitivePeerDependencies:
+      - bufferutil
+      - encoding
+      - typescript
+      - utf-8-validate
+      - zod
+
+  '@ckb-ccc/udt@0.1.0(typescript@5.7.2)':
+    dependencies:
+      '@ckb-ccc/core': 1.3.0(typescript@5.7.2)
+      '@ckb-ccc/ssri': 0.1.0(typescript@5.7.2)
+    transitivePeerDependencies:
+      - bufferutil
       - encoding
       - typescript
       - utf-8-validate

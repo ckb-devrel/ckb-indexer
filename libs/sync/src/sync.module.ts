@@ -1,5 +1,10 @@
 import { Module } from "@nestjs/common";
-import { SyncStatusRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import {
+  ScriptCodeRepo,
+  SyncStatusRepo,
+  UdtBalanceRepo,
+  UdtInfoRepo,
+} from "./repos";
 import { BlockRepo } from "./repos/block.repo";
 import { ClusterRepo } from "./repos/cluster.repo";
 import { SporeRepo } from "./repos/spore.repo";
@@ -14,6 +19,7 @@ import { UdtParser } from "./udtParser";
     SporeParserBuilder,
     UdtParser,
     BlockRepo,
+    ScriptCodeRepo,
     SyncStatusRepo,
     UdtBalanceRepo,
     UdtInfoRepo,

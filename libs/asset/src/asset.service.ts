@@ -5,11 +5,8 @@ import {
   ScriptMode,
 } from "@app/commons";
 import { Cluster, Spore, UdtInfo } from "@app/schemas";
-import { ccc } from "@ckb-ccc/core";
-import {
-  unpackToRawClusterData,
-  unpackToRawSporeData,
-} from "@ckb-ccc/spore/advanced";
+import { ccc } from "@ckb-ccc/shell";
+import { cccA } from "@ckb-ccc/shell/advanced";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
@@ -202,7 +199,7 @@ export class AssetService {
       (await this.clusterRepo.getCluster(clusterId)) ??
       this.clusterRepo.create({
         clusterId,
-        ...unpackToRawClusterData(cell.outputData),
+        ...cccA.sporeA.unpackToRawClusterData(cell.outputData),
       })
     );
   }
@@ -220,7 +217,7 @@ export class AssetService {
     if (spore) {
       return spore;
     } else {
-      const sporeData = unpackToRawSporeData(cell.outputData);
+      const sporeData = cccA.sporeA.unpackToRawSporeData(cell.outputData);
       return this.sporeRepo.create({
         sporeId,
         contentType: sporeData.contentType,

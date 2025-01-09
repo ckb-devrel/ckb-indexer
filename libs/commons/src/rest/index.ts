@@ -1,4 +1,4 @@
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export enum Chain {

@@ -6,12 +6,8 @@ import {
   ScriptMode,
   withTransaction,
 } from "@app/commons";
-import { ccc } from "@ckb-ccc/core";
-import { findCluster } from "@ckb-ccc/spore";
-import {
-  unpackToRawClusterData,
-  unpackToRawSporeData,
-} from "@ckb-ccc/spore/advanced";
+import { ccc } from "@ckb-ccc/shell";
+import { cccA } from "@ckb-ccc/shell/advanced";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { Axios, AxiosInstance } from "axios";
@@ -194,7 +190,7 @@ class SporeParser {
     url: string,
     sporeData: ccc.Hex,
     clusterData: ccc.Hex,
-  ): Promise<String> {
+  ): Promise<string> {
     const axios = new Axios({
       baseURL: url,
       method: "POST",
@@ -223,7 +219,7 @@ class SporeParser {
   }
 
   async parseSporeData(sporeId: ccc.Hex, data: ccc.Hex): Promise<SporeDetail> {
-    const sporeData = unpackToRawSporeData(data);
+    const sporeData = cccA.sporeA.unpackToRawSporeData(data);
     const decoded = {
       contentType: sporeData.contentType,
       content: ccc.hexFrom(sporeData.content),
@@ -232,7 +228,10 @@ class SporeParser {
         : undefined,
     };
     if (decoded.clusterId) {
-      const cluster = await findCluster(this.context.client, decoded.clusterId);
+      const cluster = await ccc.spore.findCluster(
+        this.context.client,
+        decoded.clusterId,
+      );
       if (cluster === undefined) {
         throw new Error(
           `Spore data broken, cluster not found: ${decoded.clusterId}`,
@@ -253,7 +252,7 @@ class SporeParser {
   }
 
   parseClusterData(data: ccc.Hex): ClusterDetial {
-    return unpackToRawClusterData(data);
+    return cccA.sporeA.unpackToRawClusterData(data);
   }
 
   async handleSporeFlow(

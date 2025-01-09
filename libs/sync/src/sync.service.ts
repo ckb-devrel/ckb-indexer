@@ -1,4 +1,5 @@
 import {
+  assertConfig,
   autoRun,
   formatSortableInt,
   headerToRepoBlock,
@@ -6,7 +7,7 @@ import {
   withTransaction,
 } from "@app/commons";
 import { Block } from "@app/schemas";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -17,7 +18,12 @@ import {
   MoreThan,
   MoreThanOrEqual,
 } from "typeorm";
-import { SyncStatusRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import {
+  ScriptCodeRepo,
+  SyncStatusRepo,
+  UdtBalanceRepo,
+  UdtInfoRepo,
+} from "./repos";
 import { BlockRepo } from "./repos/block.repo";
 import { ClusterRepo } from "./repos/cluster.repo";
 import { SporeRepo } from "./repos/spore.repo";
@@ -34,7 +40,20 @@ function getBlocksOnWorker(
   worker: Worker,
   start: ccc.NumLike,
   end: ccc.NumLike,
-): Promise<{ height: ccc.Num; block: ccc.ClientBlock }[]> {
+): Promise<
+  {
+    height: ccc.Num;
+    block: ccc.ClientBlock;
+    scriptCodes: {
+      outPoint: ccc.OutPointLike;
+      size: number;
+      dataHash: ccc.Hex;
+      typeHash?: ccc.Hex;
+      isSsri: boolean;
+      isSsriUdt: boolean;
+    }[];
+  }[]
+> {
   return new Promise((resolve, reject) => {
     worker.removeAllListeners("message");
     worker.removeAllListeners("error");
@@ -52,6 +71,7 @@ function getBlocksOnWorker(
 async function* getBlocks(props: {
   start: ccc.NumLike;
   end: ccc.NumLike;
+  ssriServerUri: string;
   workers?: number;
   chunkSize?: number;
   isMainnet?: boolean;
@@ -72,6 +92,7 @@ async function* getBlocks(props: {
         workerData: {
           isMainnet: props.isMainnet,
           rpcUri: props.rpcUri,
+          ssriServerUri: props.ssriServerUri,
           rpcTimeout: props.rpcTimeout,
           maxConcurrent: props.maxConcurrent,
         },
@@ -110,6 +131,7 @@ export class SyncService {
   private readonly logger = new Logger(SyncService.name);
 
   private readonly isMainnet: boolean | undefined;
+  private readonly ssriServerUri: string;
   private readonly ckbRpcUri: string | undefined;
   private readonly ckbRpcTimeout: number | undefined;
   private readonly maxConcurrent: number | undefined;
@@ -137,8 +159,13 @@ export class SyncService {
     private readonly sporeRepo: SporeRepo,
     private readonly clusterRepo: ClusterRepo,
     private readonly blockRepo: BlockRepo,
+    private readonly scriptCodeRepo: ScriptCodeRepo,
   ) {
     this.isMainnet = configService.get<boolean>("sync.isMainnet");
+    this.ssriServerUri = assertConfig<string>(
+      configService,
+      "sync.ssriServerUri",
+    );
     this.ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
     this.ckbRpcTimeout = configService.get<number>("sync.ckbRpcTimeout");
     this.maxConcurrent = configService.get<number>("sync.maxConcurrent");
@@ -200,9 +227,10 @@ export class SyncService {
             );
 
       let txsCount = 0;
-      for await (const { height, block } of getBlocks({
+      for await (const { height, block, scriptCodes } of getBlocks({
         start: pendingHeight,
         end: endBlock,
+        ssriServerUri: this.ssriServerUri,
         workers: this.threads,
         chunkSize: this.blockChunk,
         rpcUri: this.ckbRpcUri,
@@ -284,6 +312,22 @@ export class SyncService {
         }
 
         txsCount += block.transactions.length;
+        await Promise.all(
+          scriptCodes.map(async (scriptCode) =>
+            this.scriptCodeRepo.upsert(
+              {
+                outPoint: ccc.hexFrom(ccc.OutPoint.encode(scriptCode.outPoint)),
+                dataHash: scriptCode.dataHash,
+                typeHash: scriptCode.typeHash,
+                size: scriptCode.size,
+                isSsri: scriptCode.isSsri,
+                isSsriUdt: scriptCode.isSsriUdt,
+              },
+              ["outPoint"],
+            ),
+          ),
+        );
+
         const sporeParser = this.sporeParserBuilder.build(height);
 
         const txDiffs = await Promise.all(

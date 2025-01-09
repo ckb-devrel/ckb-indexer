@@ -5,7 +5,7 @@ import {
   ScriptMode,
 } from "@app/commons";
 import { Block, UdtBalance, UdtInfo } from "@app/schemas";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";

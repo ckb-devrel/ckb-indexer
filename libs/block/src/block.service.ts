@@ -1,6 +1,6 @@
 import { headerToRepoBlock } from "@app/commons";
 import { Block } from "@app/schemas";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { BlockRepo } from "./repos/block.repo";

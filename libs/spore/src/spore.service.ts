@@ -1,6 +1,6 @@
 import { assertConfig, parseAddress } from "@app/commons";
 import { Cluster, Spore } from "@app/schemas";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";

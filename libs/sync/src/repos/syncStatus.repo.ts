@@ -1,6 +1,6 @@
 import { formatSortableInt } from "@app/commons";
 import { SyncStatus } from "@app/schemas";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Injectable } from "@nestjs/common";
 import { EntityManager, Repository } from "typeorm";
 

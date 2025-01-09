@@ -1,5 +1,5 @@
 import { assert, parseSortableInt, RpcError, TrackerInfo } from "@app/commons";
-import { ccc } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/shell";
 import { Controller, Get } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { SyncService } from "./sync.service";
