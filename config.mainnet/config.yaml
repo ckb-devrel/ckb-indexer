@@ -36,5 +36,5 @@ sync:
   ckbRpcTimeout: 60000
   ckbRpcUri: wss://mainnet.ckb.dev/ws
   btcRpcUri: https://rpc.ankr.com/btc
-  decoderServerUri: http://localhost:3000
-  ssriServerUri: http://localhost:9090
+  decoderServerUri: http://decoder:8090
+  ssriServerUri: http://ssri:9090

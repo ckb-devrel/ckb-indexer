@@ -18,6 +18,10 @@ export class ScriptCode {
 
   @Column({ type: "varchar" })
   @Index()
+  updatedAtHeight: string;
+
+  @Column({ type: "varchar" })
+  @Index()
   dataHash: string;
 
   @Column({ type: "varchar", nullable: true })

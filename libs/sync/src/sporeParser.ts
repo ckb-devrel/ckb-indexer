@@ -173,12 +173,22 @@ class SporeParser {
     // Parse spore or cluster data before the persistence
     for (const [id, flow] of Object.entries(flows)) {
       if (mode === ScriptMode.Spore) {
-        flow.asset.spore = await this.parseSporeData(
-          ccc.hexFrom(id),
-          flow.asset.data,
-        );
+        try {
+          flow.asset.spore = await this.parseSporeData(
+            ccc.hexFrom(id),
+            flow.asset.data,
+          );
+        } catch (err) {
+          this.context.logger.warn(`Invalid spore data id ${ccc.hexFrom(id)}`);
+        }
       } else {
-        flow.asset.cluster = this.parseClusterData(flow.asset.data);
+        try {
+          flow.asset.cluster = this.parseClusterData(flow.asset.data);
+        } catch (err) {
+          this.context.logger.warn(
+            `Invalid cluster data id ${ccc.hexFrom(id)}`,
+          );
+        }
       }
       flows[id] = flow;
     }
@@ -263,6 +273,9 @@ class SporeParser {
     clusterRepo: ClusterRepo,
   ) {
     const { asset, mint, transfer, burn } = flow;
+    if (!flow.asset.spore) {
+      return;
+    }
     const prevSpore = await sporeRepo.findOne({
       where: { sporeId },
       order: { updatedAtHeight: "DESC" },
@@ -366,6 +379,9 @@ class SporeParser {
     clusterRepo: ClusterRepo,
   ) {
     const { asset, mint, transfer, burn } = flow;
+    if (!flow.asset.cluster) {
+      return;
+    }
     const prevCluster = await clusterRepo.findOne({
       where: { clusterId },
       order: { updatedAtHeight: "DESC" },

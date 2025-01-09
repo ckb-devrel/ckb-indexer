@@ -1,0 +1,60 @@
+# identifier of specific DOB protocol versions
+protocol_versions = [
+    "dob/0",
+    "dob/1",
+]
+
+# connect to the RPC of CKB node
+ckb_rpc = "https://mainnet.ckb.dev/"
+
+# address that rpc server running at in case of standalone server mode
+rpc_server_address = "0.0.0.0:8090"
+
+# directory that stores decoders on hard-disk, including on-chain and off-chain binary files
+decoders_cache_directory = "cache/decoders"
+
+# directory that stores DOBs rendering results on hard-disk
+dobs_cache_directory = "cache/dobs"
+
+# expiration time indicator for cleaning whole dobs cache, zero means never clean
+dobs_cache_expiration_sec = 300
+
+# all deployed on-chain Spore contracts binary hash (order from new to old)
+# refer to: https://github.com/sporeprotocol/spore-contract/blob/master/docs/VERSIONS.md
+[[available_spores]]
+code_hash = "0x4a4dce1df3dffff7f8b2cd7dff7303df3b6150c9788cb75dcf6747247132b9f5"
+hash_type = "data1"
+
+[[available_spores]]
+code_hash = "0xcfba73b58b6f30e70caed8a999748781b164ef9a1e218424a6fb55ebf641cb33"
+hash_type = "type"
+
+# all deployed on-chain Cluster contracts binary hash (order from new to old)
+# refer to: https://github.com/sporeprotocol/spore-contract/blob/master/docs/VERSIONS.md
+[[available_clusters]]
+code_hash = "0x7366a61534fa7c7e6225ecc0d828ea3b5366adec2b58206f2ee84995fe030075"
+hash_type = "data1"
+
+# associate `code_hash` with the corresponding onchain information about `tx_hash` and `out_index`
+# server will firstly search onchain decoders by `code_hash` in this configuration, if not found, cache will be used instead
+[[onchain_decoder_deployment]]
+code_hash = "0xb82abd59ade361a014f0abb692f71b0feb880693c3ccb95b9137b73551d872ce"
+tx_hash = "0xa0bb58aa58778d63275e6f77856c30d82c46b9b86785a422e25ac3a362e5b2cd"
+out_index = 0
+
+[[onchain_decoder_deployment]]
+code_hash = "0x1c84212ebd817e9de09d2a79f85cc421b684eda63409cfa75688f98716e77b5f"
+tx_hash = "0xa84f9426f378109dfa717cb3a29fb79b764bf466a7c2588aebcdecc874bcc984"
+out_index = 0
+
+# DOB/0
+[[onchain_decoder_deployment]]
+code_hash = "0x13cac78ad8482202f18f9df4ea707611c35f994375fa03ae79121312dda9925c"
+tx_hash = "0x71023885a2178648be6a7f138ee49379000a82cda98dd8adabee99eaaca42fde"
+out_index = 0
+
+# DOB/1 commit:0bbbfd74966a7d3d4dcadc3d70979855b9e478de
+[[onchain_decoder_deployment]]
+code_hash = "0xda3525549b72970b4c95f5b5749357f20d1293d335710b674f09c32f7d54b6dc"
+tx_hash = "0x99cc81b5e4c311519173f3f6f771dff64a2f64c97f5f724877c4352cd1b3b32c"
+out_index = 0

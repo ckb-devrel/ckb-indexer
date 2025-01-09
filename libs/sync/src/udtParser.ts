@@ -6,18 +6,52 @@ import {
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
+import { ScriptCode } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
-import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import { ScriptCodeRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
+
+enum UdtType {
+  SUdt = "sUdt",
+  Ssri = "Ssri",
+}
+
+type UdtTypeInfo =
+  | { type: UdtType.Ssri; scriptCode: ScriptCode }
+  | { type: UdtType.SUdt };
+
+type TokenInfo = {
+  name?: string;
+  symbol?: string;
+  decimals?: number;
+  icon?: string;
+};
+
+async function trySsriMethod<T>(
+  fn: () => Promise<ccc.ssri.ExecutorResponse<T>>,
+): Promise<ccc.ssri.ExecutorResponse<T | undefined>> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (
+      !(err instanceof ccc.ssri.ExecutorErrorExecutionFailed) &&
+      !(err instanceof ccc.ssri.ExecutorErrorExecutionFailed)
+    ) {
+      throw err;
+    }
+    return ccc.ssri.ExecutorResponse.new(undefined);
+  }
+}
 
 @Injectable()
 export class UdtParser {
   public readonly logger = new Logger(UdtParser.name);
   public readonly btcRequester: AxiosInstance;
   public readonly client: ccc.Client;
+  public readonly executor: ccc.ssri.Executor;
 
   public readonly udtTypes: ccc.Script[];
 
@@ -27,12 +61,29 @@ export class UdtParser {
   constructor(
     configService: ConfigService,
     public readonly entityManager: EntityManager,
+    public readonly udtInfoRepo: UdtInfoRepo,
+    public readonly scriptCodeRepo: ScriptCodeRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
+    const ssriServerUri = assertConfig<string>(
+      configService,
+      "sync.ssriServerUri",
+    );
+    this.executor = new ccc.ssri.ExecutorJsonRpc(ssriServerUri);
+    const ckbRpcTimeout = configService.get<number>("sync.ckbRpcTimeout");
+    const maxConcurrent = configService.get<number>("sync.maxConcurrent");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
     this.client = isMainnet
-      ? new ccc.ClientPublicMainnet({ url: ckbRpcUri })
-      : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
+      ? new ccc.ClientPublicMainnet({
+          url: ckbRpcUri,
+          timeout: ckbRpcTimeout,
+          maxConcurrent,
+        })
+      : new ccc.ClientPublicTestnet({
+          url: ckbRpcUri,
+          timeout: ckbRpcTimeout,
+          maxConcurrent,
+        });
 
     this.btcRequester = axios.create({
       baseURL: assertConfig(configService, "sync.btcRpcUri"),
@@ -65,7 +116,8 @@ export class UdtParser {
     tx: ccc.Transaction,
     blockHeight: ccc.Num,
     udtDiffs: {
-      udtType: ccc.Script;
+      udtType: { script: ccc.Script; typeInfo: UdtTypeInfo };
+      info: TokenInfo;
       diffs: { address: string; balance: ccc.Num; capacity: ccc.Num }[];
       netBalance: ccc.Num;
       netCapacity: ccc.Num;
@@ -79,8 +131,14 @@ export class UdtParser {
         const udtInfoRepo = new UdtInfoRepo(entityManager);
         const udtBalanceRepo = new UdtBalanceRepo(entityManager);
 
-        for (const { udtType, diffs, netBalance, netCapacity } of udtDiffs) {
-          const tokenHash = udtType.hash();
+        for (const {
+          udtType,
+          info,
+          diffs,
+          netBalance,
+          netCapacity,
+        } of udtDiffs) {
+          const tokenHash = udtType.script.hash();
 
           /* === Update UDT Info === */
           const existedUdtInfo = await udtInfoRepo.findOne({
@@ -98,9 +156,9 @@ export class UdtParser {
 
               updatedAtHeight: formatSortable(blockHeight),
 
-              typeCodeHash: udtType.codeHash,
-              typeHashType: udtType.hashType,
-              typeArgs: udtType.args,
+              typeCodeHash: udtType.script.codeHash,
+              typeHashType: udtType.script.hashType,
+              typeArgs: udtType.script.args,
 
               firstIssuanceTxHash: txHash,
               totalSupply: formatSortable("0"),
@@ -126,16 +184,10 @@ export class UdtParser {
             udtInfo.decimals == null &&
             udtInfo.icon == null
           ) {
-            /* === TODO: Get UDT info from SSRI === */
-            /* === TODO: Get UDT info from SSRI === */
-
-            if (netBalance > ccc.Zero) {
-              const { name, symbol, decimals } =
-                await this.getTokenInfoInTx(tx);
-              udtInfo.name = name;
-              udtInfo.symbol = symbol;
-              udtInfo.decimals = decimals;
-            }
+            udtInfo.name = info.name ?? null;
+            udtInfo.symbol = info.symbol ?? null;
+            udtInfo.decimals = info.decimals ?? null;
+            udtInfo.icon = info.icon ?? null;
           }
 
           udtInfo.updatedAtHeight = formatSortableInt(blockHeight);
@@ -200,7 +252,9 @@ export class UdtParser {
     );
   }
 
-  async getUdtTypesInTx(tx: ccc.Transaction): Promise<ccc.Script[]> {
+  async getUdtTypesInTx(
+    tx: ccc.Transaction,
+  ): Promise<{ script: ccc.Script; typeInfo: UdtTypeInfo }[]> {
     const scripts: ccc.Bytes[] = [];
     await Promise.all(
       tx.inputs.map(async (input) => {
@@ -229,35 +283,51 @@ export class UdtParser {
       await Promise.all(
         scripts.map(async (raw) => {
           const script = ccc.Script.fromBytes(raw);
-          if (!(await this.isTypeUdt(script))) {
+          const typeInfo = await this.isTypeUdt(script);
+          if (!typeInfo) {
             return;
           }
-          return script;
+          return { script, typeInfo };
         }),
       )
     ).filter((s) => s !== undefined);
   }
 
-  async isTypeUdt(script: ccc.Script): Promise<boolean> {
+  async isTypeUdt(script: ccc.Script): Promise<UdtTypeInfo | undefined> {
+    const scriptCode = await (() => {
+      if (script.hashType === "type") {
+        return this.scriptCodeRepo.findOne({
+          where: { typeHash: script.codeHash },
+          order: { updatedAtHeight: "DESC" },
+        });
+      }
+      return this.scriptCodeRepo.findOne({
+        where: { dataHash: script.codeHash },
+        order: { updatedAtHeight: "DESC" },
+      });
+    })();
+
+    if (scriptCode && scriptCode.isSsri && scriptCode.isSsriUdt) {
+      return { type: UdtType.Ssri, scriptCode };
+    }
+
     if (
       this.udtTypes.some(
         ({ codeHash, hashType }) =>
           script.codeHash === codeHash && script.hashType === hashType,
       )
     ) {
-      return true;
+      return { type: UdtType.SUdt };
     }
 
-    /* === TODO: Check if the tx contains SSRI UDT === */
-    /* === TODO: Check if the tx contains SSRI UDT === */
-
-    return false;
+    return undefined;
   }
 
   async getBalanceDiffInTx(
     tx: ccc.Transaction,
-    udtType: ccc.Script,
+    udtType: { script: ccc.Script; typeInfo: UdtTypeInfo },
   ): Promise<{
+    info: TokenInfo;
     diffs: { address: string; balance: ccc.Num; capacity: ccc.Num }[];
     netBalance: ccc.Num;
     netCapacity: ccc.Num;
@@ -269,7 +339,10 @@ export class UdtParser {
 
     await Promise.all(
       tx.inputs.map(async (input) => {
-        if (!input.cellOutput?.type || !input.cellOutput.type.eq(udtType)) {
+        if (
+          !input.cellOutput?.type ||
+          !input.cellOutput.type.eq(udtType.script)
+        ) {
           return;
         }
         const address = await this.scriptToAddress(input.cellOutput.lock);
@@ -299,7 +372,7 @@ export class UdtParser {
       tx.outputs.map(async (output, i) => {
         const outputData = tx.outputsData[i];
 
-        if (!output.type || !output.type.eq(udtType)) {
+        if (!output.type || !output.type.eq(udtType.script)) {
           return;
         }
 
@@ -325,18 +398,60 @@ export class UdtParser {
       }),
     );
 
+    const info: TokenInfo = {};
+    const existed = await this.udtInfoRepo.findOneBy({
+      hash: udtType.script.hash(),
+    });
+    if (
+      !existed ||
+      (existed.name == null &&
+        existed.symbol == null &&
+        existed.decimals == null &&
+        existed.icon == null)
+    ) {
+      if (udtType.typeInfo.type === UdtType.Ssri) {
+        const udt = new ccc.udt.Udt(
+          ccc.OutPoint.fromBytes(udtType.typeInfo.scriptCode.outPoint),
+          udtType.script,
+          { executor: this.executor },
+        );
+
+        const [
+          { res: name },
+          { res: symbol },
+          { res: decimals },
+          { res: icon },
+        ] = await Promise.all([
+          trySsriMethod(() => udt.name()),
+          trySsriMethod(() => udt.symbol()),
+          trySsriMethod(() => udt.decimals()),
+          trySsriMethod(() => udt.icon()),
+        ]);
+
+        info.name = name;
+        info.symbol = symbol;
+        info.decimals = Number(decimals);
+        info.icon = icon;
+      } else if (
+        udtType.typeInfo.type === UdtType.SUdt &&
+        netBalance > ccc.Zero
+      ) {
+        const { name, symbol, decimals } = await this.getTokenInfoInTx(tx);
+        info.name = name;
+        info.symbol = symbol;
+        info.decimals = decimals;
+      }
+    }
+
     return {
+      info,
       diffs,
       netBalance,
       netCapacity,
     };
   }
 
-  async getTokenInfoInTx(tx: ccc.Transaction): Promise<{
-    decimals: number | null;
-    name: string | null;
-    symbol: string | null;
-  }> {
+  async getTokenInfoInTx(tx: ccc.Transaction): Promise<TokenInfo> {
     const uniqueType = await this.client.getKnownScript(
       ccc.KnownScript.UniqueType,
     );
@@ -361,22 +476,22 @@ export class UdtParser {
       const decimals = Number(ccc.numFromBytes(outputData.slice(0, 1)));
 
       if (outputData.length < 2) {
-        return { decimals, name: null, symbol: null };
+        return { decimals };
       }
       const nameLen = Number(ccc.numFromBytes(outputData.slice(1, 2)));
       if (outputData.length < 2 + nameLen) {
-        return { decimals, name: null, symbol: null };
+        return { decimals };
       }
       const name = ccc.bytesTo(outputData.slice(2, 2 + nameLen), "utf8");
 
       if (outputData.length < 3 + nameLen) {
-        return { decimals, name, symbol: null };
+        return { decimals, name };
       }
       const symbolLen = Number(
         ccc.numFromBytes(outputData.slice(2 + nameLen, 3 + nameLen)),
       );
       if (outputData.length < 3 + nameLen + symbolLen) {
-        return { decimals, name, symbol: null };
+        return { decimals, name };
       }
       const symbol = ccc.bytesTo(
         outputData.slice(3 + nameLen, 3 + nameLen + symbolLen),
@@ -390,7 +505,7 @@ export class UdtParser {
       };
     }
 
-    return { name: null, symbol: null, decimals: null };
+    return {};
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {

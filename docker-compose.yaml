@@ -9,6 +9,7 @@ services:
     depends_on:
       - db
       - decoder
+      - ssri
     networks:
       - networks
 
@@ -20,7 +21,7 @@ services:
       MYSQL_USER: appdb
       MYSQL_PASSWORD: appdb
     command:
-      - '--skip-log-bin'
+      - "--skip-log-bin"
     volumes:
       - ./mysql:/var/lib/mysql
     restart: always
@@ -30,7 +31,15 @@ services:
   decoder:
     image: hanssen0/ckb-dob-decoder-server
     volumes:
-      - ./config/settings.testnet.toml:/app/settings.toml
+      - ./config/config.dob-decoder.toml:/app/settings.toml
+    restart: always
+    networks:
+      - networks
+
+  ssri:
+    image: hanssen0/ckb-ssri-server
+    volumes:
+      - ./config/config.ssri-server.toml:/app/config.toml
     restart: always
     networks:
       - networks

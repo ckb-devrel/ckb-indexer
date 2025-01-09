@@ -313,19 +313,23 @@ export class SyncService {
 
         txsCount += block.transactions.length;
         await Promise.all(
-          scriptCodes.map(async (scriptCode) =>
-            this.scriptCodeRepo.upsert(
-              {
-                outPoint: ccc.hexFrom(ccc.OutPoint.encode(scriptCode.outPoint)),
+          scriptCodes.map(async (scriptCode) => {
+            const outPoint = ccc.hexFrom(
+              ccc.OutPoint.encode(scriptCode.outPoint),
+            );
+            const existed = await this.scriptCodeRepo.findOneBy({ outPoint });
+            if (!existed) {
+              await this.scriptCodeRepo.save({
+                outPoint,
+                updatedAtHeight: formatSortableInt(height),
                 dataHash: scriptCode.dataHash,
                 typeHash: scriptCode.typeHash,
                 size: scriptCode.size,
                 isSsri: scriptCode.isSsri,
                 isSsriUdt: scriptCode.isSsriUdt,
-              },
-              ["outPoint"],
-            ),
-          ),
+              });
+            }
+          }),
         );
 
         const sporeParser = this.sporeParserBuilder.build(height);

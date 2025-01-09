@@ -112,26 +112,20 @@ parentPort?.addListener("message", ({ start, end }) =>
             let isSsri = false;
             let isSsriUdt = false;
             try {
-              await trait.version();
+              const { res } = await trait.hasMethods([
+                "UDT.name",
+                "UDT.symbol",
+                "UDT.decimals",
+                "UDT.icon",
+              ]);
               isSsri = true;
+              isSsriUdt = res.some((v) => v);
             } catch (err) {
-              if (!(err instanceof ccc.ssri.ExecutorErrorExecutionFailed)) {
+              if (
+                !(err instanceof ccc.ssri.ExecutorErrorExecutionFailed) &&
+                !(err instanceof ccc.ssri.ExecutorErrorDecode)
+              ) {
                 throw err;
-              }
-            }
-            if (isSsri) {
-              try {
-                const { res } = await trait.hasMethods([
-                  "UDT.name",
-                  "UDT.symbol",
-                  "UDT.decimals",
-                  "UDT.icon",
-                ]);
-                isSsriUdt = res.some((v) => v);
-              } catch (err) {
-                if (!(err instanceof ccc.ssri.ExecutorErrorExecutionFailed)) {
-                  throw err;
-                }
               }
             }
 
@@ -140,7 +134,7 @@ parentPort?.addListener("message", ({ start, end }) =>
                 txHash: tx.hash(),
                 index: i,
               },
-              size: data.length,
+              size: data.length / 2 - 1,
               dataHash: ccc.hashCkb(data),
               typeHash: output.type?.hash(),
               isSsri,
