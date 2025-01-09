@@ -220,6 +220,15 @@ export async function parseAddress(
       params: [txId.slice(2), true],
     });
 
+    if (
+      data?.error &&
+      !JSON.stringify(data?.error).includes(
+        "No such mempool or blockchain transaction.",
+      )
+    ) {
+      throw data.error;
+    }
+
     if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
       logger?.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
       return ckbAddress;
