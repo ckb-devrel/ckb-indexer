@@ -1,0 +1,39 @@
+port: 8080
+
+mysql:
+  host: db
+  port: 3306
+  username: appdb
+  password: appdb
+  database: appdb
+
+sync:
+  interval: 10000
+  threads: 8
+  blockChunk: 100
+  blockLimitPerInterval: 50000
+  blockSyncStart: 11922670
+
+  clearInterval: 1800000
+  confirmations: 100
+
+  rgbppBtcCodeHash: "0xbc6c568a1a0d0a09f6844dc9d74ddb4343c32143ff25f727c59edf4fb72d6936"
+  rgbppBtcHashType: "type"
+
+  rgbppBtcTimelockCodeHash: ""
+  rgbppBtcTimelockHashType: "type"
+
+  udtTypes:
+    # sUDT
+    - codeHash: "0x5e7a36a77e68eecc013dfa2fe6a23f3b6c344b04005808694ae6dd45eea4cfd5"
+      hashType: "type"
+    # xUDT
+    - codeHash: "0x50bd8d6680b8b9cf98b73f3c08faf8b2a21914311954118ad6609be6e78a1b95"
+      hashType: "data1"
+
+  isMainnet: true
+  maxConcurrent: 1024
+  ckbRpcTimeout: 60000
+  ckbRpcUri: wss://mainnet.ckb.dev/ws
+  btcRpcUri: https://rpc.ankr.com/btc
+  decoderServerUri: http://localhost:3000

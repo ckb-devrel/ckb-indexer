@@ -15,6 +15,7 @@ import {
   LessThan,
   LessThanOrEqual,
   MoreThan,
+  MoreThanOrEqual,
 } from "typeorm";
 import { SyncStatusRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
 import { BlockRepo } from "./repos/block.repo";
@@ -27,6 +28,7 @@ import { UdtParser } from "./udtParser";
 
 const SYNC_KEY = "SYNCED";
 const PENDING_KEY = "PENDING";
+const PENDING_HASH_KEY = "PENDING_HASH";
 
 function getBlocksOnWorker(
   worker: Worker,
@@ -212,6 +214,75 @@ export class SyncService {
           this.logger.error(`Failed to get block ${height}`);
           break;
         }
+
+        const pendingHash = await this.syncStatusRepo.findOneBy({
+          key: PENDING_HASH_KEY,
+        });
+        if (pendingHash && pendingHash.value !== block.header.parentHash) {
+          this.logger.warn("Blockchain reorg detected, rolling back data");
+          await withTransaction(
+            this.entityManager,
+            undefined,
+            async (entityManager) => {
+              /* === Rollback block status === */
+              const blockRepo = new BlockRepo(entityManager);
+              const syncStatusRepo = new SyncStatusRepo(entityManager);
+
+              const block = await blockRepo.findOneBy({
+                hash: pendingHash.value,
+              });
+              if (!block) {
+                throw new Error(
+                  `Failed to find block to rollback ${pendingHash.value}`,
+                );
+              }
+              const rolledBackHeight = formatSortableInt(block.height);
+              await blockRepo.delete({ hash: block.hash });
+
+              const updateHash = await syncStatusRepo.update(pendingHash, {
+                value: block.parentHash,
+              });
+              const updateNumber = await syncStatusRepo.update(pendingStatus, {
+                value: formatSortableInt(
+                  parseSortableInt(block.height) - ccc.numFrom(1),
+                ),
+              });
+              if (
+                (updateHash.affected ?? 0) + (updateNumber.affected ?? 0) ===
+                0
+              ) {
+                throw new Error(
+                  `Failed to rollback pending block hash from ${pendingStatus.value}(${pendingHash.value}) to ${block.height}(${block.parentHash})`,
+                );
+              }
+              /* === Rollback block status === */
+
+              /* === Rollback records === */
+              const clusterRepo = new ClusterRepo(entityManager);
+              const sporeRepo = new SporeRepo(entityManager);
+              const udtInfoRepo = new UdtInfoRepo(entityManager);
+              const udtBalanceRepo = new UdtBalanceRepo(entityManager);
+
+              await Promise.all([
+                clusterRepo.delete({
+                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
+                }),
+                sporeRepo.delete({
+                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
+                }),
+                udtInfoRepo.delete({
+                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
+                }),
+                udtBalanceRepo.delete({
+                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
+                }),
+              ]);
+              /* === Rollback records === */
+            },
+          );
+          return;
+        }
+
         txsCount += block.transactions.length;
         const sporeParser = this.sporeParserBuilder.build(height);
 
@@ -219,15 +290,8 @@ export class SyncService {
           block.transactions.map(async (txLike) => {
             const tx = ccc.Transaction.from(txLike);
             const diffs = await this.udtParser.udtInfoHandleTx(tx);
-            return { tx, diffs };
-          }),
-        );
-
-        const txFlows = await Promise.all(
-          block.transactions.map(async (txLike) => {
-            const tx = ccc.Transaction.from(txLike);
             const flows = await sporeParser.analyzeTxFlow(tx);
-            return { tx, flows };
+            return { tx, diffs, flows };
           }),
         );
 
@@ -243,12 +307,28 @@ export class SyncService {
               height: formatSortableInt(block.header.number),
               timestamp: Number(block.header.timestamp / 1000n),
             });
-
-            for (const { tx, flows } of txFlows) {
-              await sporeParser.handleFlows(entityManager, tx, flows);
+            if (pendingHash) {
+              const update = await syncStatusRepo.update(
+                {
+                  key: PENDING_HASH_KEY,
+                  value: pendingHash.value,
+                },
+                { value: block.header.hash },
+              );
+              if (update.affected === 0) {
+                throw new Error(
+                  `Failed to update pending block hash from ${pendingHash.value} to ${block.header.hash}`,
+                );
+              }
+            } else {
+              await syncStatusRepo.save({
+                key: PENDING_HASH_KEY,
+                value: block.header.hash,
+              });
             }
 
-            for (const { tx, diffs } of txDiffs) {
+            for (const { tx, diffs, flows } of txDiffs) {
+              await sporeParser.handleFlows(entityManager, tx, flows);
               await this.udtParser.saveDiffs(entityManager, tx, height, diffs);
             }
 
