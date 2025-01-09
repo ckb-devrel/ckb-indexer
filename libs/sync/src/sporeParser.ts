@@ -255,7 +255,7 @@ class SporeParser {
         );
         Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
       } catch (error) {
-        this.context.logger.error(`Spore ${sporeId}: ${error}`);
+        this.context.logger.warn(`Spore ${sporeId}: ${error}`);
       }
     }
     return decoded;
@@ -310,7 +310,6 @@ class SporeParser {
         updatedAtHeight: formatSortableInt(this.blockHeight),
       });
       await sporeRepo.save(spore);
-      this.context.logger.log(`Mint Spore ${sporeId} at tx ${txHash}`);
     }
 
     if (transfer) {
@@ -339,7 +338,6 @@ class SporeParser {
             : undefined,
       });
       await sporeRepo.save(spore);
-      this.context.logger.log(`Transfer Spore ${sporeId} at tx ${txHash}`);
     }
 
     if (burn) {
@@ -368,7 +366,6 @@ class SporeParser {
             : undefined,
       });
       await sporeRepo.save(spore);
-      this.context.logger.log(`Burn Spore ${sporeId} at tx ${txHash}`);
     }
   }
 
@@ -400,7 +397,9 @@ class SporeParser {
         updatedAtHeight: formatSortableInt(this.blockHeight),
       });
       await clusterRepo.save(cluster);
-      this.context.logger.log(`Mint Cluster ${clusterId} at tx ${txHash}`);
+      this.context.logger.log(
+        `Mint Cluster ${asset.cluster?.name}(${clusterId}) at tx ${txHash}`,
+      );
     }
 
     if (transfer) {
@@ -429,7 +428,6 @@ class SporeParser {
             : undefined,
       });
       await clusterRepo.save(cluster);
-      this.context.logger.log(`Transfer Cluster ${clusterId} at tx ${txHash}`);
     }
 
     if (burn) {
