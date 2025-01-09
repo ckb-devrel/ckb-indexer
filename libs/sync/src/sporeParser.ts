@@ -7,14 +7,14 @@ import {
   withTransaction,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/core";
-import { dob } from "@ckb-ccc/spore";
+import { findCluster } from "@ckb-ccc/spore";
 import {
   unpackToRawClusterData,
   unpackToRawSporeData,
 } from "@ckb-ccc/spore/advanced";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import axios, { Axios, AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
 import { ClusterRepo } from "./repos/cluster.repo";
 import { SporeRepo } from "./repos/spore.repo";
@@ -190,6 +190,38 @@ class SporeParser {
     return flows;
   }
 
+  async decodeDob(
+    url: string,
+    sporeData: ccc.Hex,
+    clusterData: ccc.Hex,
+  ): Promise<String> {
+    const axios = new Axios({
+      baseURL: url,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    const result = await axios.post(
+      "/",
+      JSON.stringify({
+        id: 0,
+        jsonrpc: "2.0",
+        method: "dob_raw_decode",
+        params: [sporeData, clusterData],
+      }),
+    );
+    const decoderResult = JSON.parse(result.data);
+    if ("error" in decoderResult) {
+      throw new Error(
+        `Decode DOB failed: ${JSON.stringify(decoderResult.error)}`,
+      );
+    }
+    const renderResult = JSON.parse(decoderResult.result);
+    const renderOutput = JSON.parse(renderResult.render_output);
+    return renderOutput;
+  }
+
   async parseSporeData(sporeId: ccc.Hex, data: ccc.Hex): Promise<SporeDetail> {
     const sporeData = unpackToRawSporeData(data);
     const decoded = {
@@ -199,14 +231,23 @@ class SporeParser {
         ? ccc.hexFrom(sporeData.clusterId)
         : undefined,
     };
-    try {
-      const dobDecoded = await dob.decodeDobBySporeId(
-        sporeId,
-        this.context.decoderUri,
-      );
-      Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
-    } catch (error) {
-      this.context.logger.error(`Spore ${sporeId} DOB decode failed: ${error}`);
+    if (decoded.clusterId) {
+      const cluster = await findCluster(this.context.client, decoded.clusterId);
+      if (cluster === undefined) {
+        throw new Error(
+          `Spore data broken, cluster not found: ${decoded.clusterId}`,
+        );
+      }
+      try {
+        const dobDecoded = await this.decodeDob(
+          this.context.decoderUri,
+          data,
+          cluster.cell.outputData,
+        );
+        Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
+      } catch (error) {
+        this.context.logger.error(`Spore ${sporeId}: ${error}`);
+      }
     }
     return decoded;
   }
