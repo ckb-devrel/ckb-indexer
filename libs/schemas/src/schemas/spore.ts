@@ -23,10 +23,10 @@ export class Spore {
   @Column({ type: "mediumtext" })
   content: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "mediumtext" })
   contentType: string;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: "mediumtext", nullable: true })
   dobDecoded?: string;
 
   @Column({ type: "varchar" })

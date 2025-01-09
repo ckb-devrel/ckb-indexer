@@ -33,10 +33,10 @@ export class UdtInfo {
   typeArgs: string;
   /* === Token type script === */
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: "mediumtext", nullable: true })
   name: string | null;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: "mediumtext", nullable: true })
   symbol: string | null;
 
   @Column({ type: "int", nullable: true })
