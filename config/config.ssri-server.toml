@@ -1,0 +1,4 @@
+ckb_rpc = "https://testnet.ckb.dev/"
+server_addr = "0.0.0.0:9090"
+
+script_debug = false
