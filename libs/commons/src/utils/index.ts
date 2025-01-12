@@ -220,10 +220,14 @@ export async function parseAddress(
       params: [txId.slice(2), true],
     });
 
+    const error = data?.error ? JSON.stringify(data?.error) : undefined;
     if (
-      data?.error &&
-      !JSON.stringify(data?.error).includes(
-        "No such mempool or blockchain transaction.",
+      error !== undefined &&
+      // From BTC core
+      !error?.includes("No such mempool or blockchain transaction.") &&
+      // From Ankr's BTC rpc
+      !error?.includes(
+        "Retry failed, reason: Node responded with non success status code",
       )
     ) {
       throw data.error;
