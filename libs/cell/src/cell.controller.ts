@@ -77,7 +77,7 @@ export class CellController {
     type: TokenCell,
     description: "Get an on-chain cell by CKB OutPoint",
   })
-  @Get("/cells/outpoint/:txHash/:index")
+  @Get("/cells/by-outpoint/:txHash/:index")
   async getCellByOutpoint(
     @Param("txHash") txHash: string,
     @Param("index") index: number,
@@ -94,7 +94,7 @@ export class CellController {
     type: TokenCell,
     description: "Get an on-chain cell by isomorphic UTXO",
   })
-  @Get("/cells/isomorphic/:btcTxHash/:index")
+  @Get("/cells/by-isomorphic/:btcTxHash/:index")
   async getIsomorphicCellByUtxo(
     @Param("btcTxHash") btcTxHash: string,
     @Param("index") index: number,
@@ -111,7 +111,7 @@ export class CellController {
     type: [TokenCell],
     description: "Get paged tokens under a user CKB address",
   })
-  @Get("/cells/paged/:tokenId/:address/:limit?cursor=:cursor?")
+  @Get("/cells/:tokenId/:address/:limit")
   async getUserTokenCells(
     @Param("tokenId") tokenId: string,
     @Param("address") address: string,

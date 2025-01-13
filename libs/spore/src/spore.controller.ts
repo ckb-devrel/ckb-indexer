@@ -12,10 +12,10 @@ export class SporeController {
     type: ClusterInfo,
     description: "Get an on-chain cluster by the clusterId",
   })
-  @Get("/clusters/:clusterId?withDesc=:withDesc")
+  @Get("/clusters/:clusterId")
   async getSporeClusterById(
     @Param("clusterId") clusterId: string,
-    @Query("withDesc") withDesc: boolean,
+    @Query("withDesc") withDesc?: boolean,
   ): Promise<ClusterInfo> {
     const cluster = assert(
       await this.service.getCluster(clusterId),
@@ -48,10 +48,11 @@ export class SporeController {
     type: NFTInfo,
     description: "Get an on-chain spore by the sporeId",
   })
-  @Get("/spores/:sporeId?withClusterDesc=:withClusterDesc")
+  @Get("/spores/:sporeId")
+  // @Get("/spores/:sporeId?withClusterDesc=:withClusterDesc")
   async getSporeById(
     @Param("sporeId") sporeId: string,
-    @Query("withClusterDesc") withClusterDesc: boolean,
+    @Query("withClusterDesc") withClusterDesc?: boolean,
   ): Promise<NFTInfo> {
     const spore = assert(
       await this.service.getSpore(sporeId),
