@@ -1,4 +1,5 @@
 import {
+  ApiError,
   assert,
   asyncMap,
   Chain,
@@ -28,6 +29,7 @@ export class AssetController {
     index: number,
     eventType: EventType,
   ): Promise<TxAssetCellDetail> {
+    const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     const scriptMode = await this.service.scriptMode(cell.cellOutput.lock);
     const isomorphicInfo = extractIsomorphicInfo(cell.cellOutput.lock);
     let isomorphicBinding: IsomorphicBinding | undefined = undefined;
@@ -56,7 +58,7 @@ export class AssetController {
       capacity: cell.cellOutput.capacity,
       eventType,
       address: await this.service.scriptToAddress(cell.cellOutput.lock),
-      typeCodeName: scriptMode,
+      typeCodeName: await this.service.scriptMode(typeScript),
       rgbppBinding: isomorphicBinding,
     };
 
@@ -123,6 +125,9 @@ export class AssetController {
 
     const inputCells = await this.service.extractCellsFromTxInputs(tx);
     for (const [index, input] of inputCells.entries()) {
+      if (input.cell.cellOutput.type === undefined) {
+        continue;
+      }
       const cellAsset = await this.extractCellAssetFromCell(
         input.cell,
         index,
@@ -151,6 +156,9 @@ export class AssetController {
 
     const outputCells = await this.service.extractCellsFromTxOutputs(tx);
     for (const [index, output] of outputCells.entries()) {
+      if (output.cell.cellOutput.type === undefined) {
+        continue;
+      }
       const cellAsset = await this.extractCellAssetFromCell(
         output.cell,
         index,
@@ -159,7 +167,7 @@ export class AssetController {
       if (cellAsset.nftData) {
         const nftIndex = txAssetData.inputs.findIndex(
           (input) =>
-            input.nftData?.tokenId === cellAsset.nftData?.tokenId ||
+            input.nftData?.tokenId === cellAsset.nftData?.tokenId &&
             input.nftData?.clusterId === cellAsset.nftData?.clusterId,
         );
         if (nftIndex >= 0) {
@@ -238,12 +246,19 @@ export class AssetController {
   @Get("/assetCells/by-transaction/:txHash")
   async queryTxAssetCellDataByTxHash(
     @Param("txHash") txHash: string,
-  ): Promise<TxAssetCellData> {
-    const { tx, blockHash, blockNumber } = assert(
-      await this.service.getTransactionWithBlockByTxHash(txHash),
-      RpcError.TxNotFound,
-    );
-    return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
+  ): Promise<TxAssetCellData | ApiError> {
+    try {
+      const { tx, blockHash, blockNumber } = assert(
+        await this.service.getTransactionWithBlockByTxHash(txHash),
+        RpcError.TxNotFound,
+      );
+      return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return e;
+      }
+      throw e;
+    }
   }
 
   @ApiOkResponse({
@@ -253,20 +268,27 @@ export class AssetController {
   @Get("/assetCells/by-block/:blockHash")
   async queryTxAssetCellDataListByBlockHash(
     @Param("blockHash") blockHash: string,
-  ): Promise<TxAssetCellData[]> {
-    const block = assert(
-      await this.service.getBlockByBlockHash(blockHash),
-      RpcError.BlockNotFound,
-    );
-    const txAssetCellDataList: TxAssetCellData[] = [];
-    await asyncMap(block.transactions, async (tx) => {
-      const txAssetCellData = await this.extractTxAssetFromTx(
-        tx,
-        block.header.hash,
-        block.header.number,
+  ): Promise<TxAssetCellData[] | ApiError> {
+    try {
+      const block = assert(
+        await this.service.getBlockByBlockHash(blockHash),
+        RpcError.BlockNotFound,
       );
-      txAssetCellDataList.push(txAssetCellData);
-    });
-    return txAssetCellDataList;
+      const txAssetCellDataList: TxAssetCellData[] = [];
+      await asyncMap(block.transactions, async (tx) => {
+        const txAssetCellData = await this.extractTxAssetFromTx(
+          tx,
+          block.header.hash,
+          block.header.number,
+        );
+        txAssetCellDataList.push(txAssetCellData);
+      });
+      return txAssetCellDataList;
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return e;
+      }
+      throw e;
+    }
   }
 }

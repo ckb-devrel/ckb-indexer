@@ -1,4 +1,5 @@
 import {
+  ApiError,
   assert,
   asyncMap,
   Chain,
@@ -11,7 +12,7 @@ import {
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
 import { Controller, Get, Param, Query } from "@nestjs/common";
-import { ApiOkResponse } from "@nestjs/swagger";
+import { ApiOkResponse, ApiQuery } from "@nestjs/swagger";
 import { CellService } from "./cell.service";
 
 (BigInt.prototype as any).toJSON = function () {
@@ -67,7 +68,7 @@ export class CellController {
       capacity: ccc.numFrom(cell.cellOutput.capacity),
       data: cell.outputData,
       tokenAmount:
-        typeScriptType === ScriptMode.Xudt
+        typeScriptType === ScriptMode.Udt
           ? ccc.udtBalanceFrom(cell.outputData)
           : undefined,
       spent: spender !== undefined,
@@ -85,13 +86,20 @@ export class CellController {
   async getCellByOutpoint(
     @Param("txHash") txHash: string,
     @Param("index") index: number,
-  ): Promise<TokenCell> {
-    const { cell, spender } = assert(
-      await this.service.getCellByOutpoint(txHash, index),
-      RpcError.CkbCellNotFound,
-    );
-    assert(cell.cellOutput.type, RpcError.CellNotAsset);
-    return await this.cellToTokenCell(cell, spender);
+  ): Promise<TokenCell | ApiError> {
+    try {
+      const { cell, spender } = assert(
+        await this.service.getCellByOutpoint(txHash, index),
+        RpcError.CkbCellNotFound,
+      );
+      assert(cell.cellOutput.type, RpcError.CellNotAsset);
+      return await this.cellToTokenCell(cell, spender);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return e;
+      }
+      throw e;
+    }
   }
 
   @ApiOkResponse({
@@ -102,18 +110,33 @@ export class CellController {
   async getIsomorphicCellByUtxo(
     @Param("btcTxHash") btcTxHash: string,
     @Param("index") index: number,
-  ): Promise<TokenCell> {
-    const { cell, spender } = assert(
-      await this.service.getRgbppCellByUtxo(btcTxHash, index),
-      RpcError.RgbppCellNotFound,
-    );
-    assert(cell.cellOutput.type, RpcError.CellNotAsset);
-    return await this.cellToTokenCell(cell, spender);
+  ): Promise<TokenCell | ApiError> {
+    try {
+      const { cell, spender } = assert(
+        await this.service.getRgbppCellByUtxo(btcTxHash, index),
+        RpcError.RgbppCellNotFound,
+      );
+      assert(cell.cellOutput.type, RpcError.CellNotAsset);
+      return await this.cellToTokenCell(cell, spender);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return e;
+      }
+      throw e;
+    }
   }
 
   @ApiOkResponse({
     type: [TokenCell],
     description: "Get paged tokens under a user CKB address",
+  })
+  @ApiQuery({
+    name: "cursor",
+    required: false,
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
   })
   @Get("/cells/:tokenId/:address")
   async getUserTokenCells(
