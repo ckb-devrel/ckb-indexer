@@ -4,6 +4,10 @@ import { Controller, Get } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { SyncService } from "./sync.service";
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 @Controller()
 export class SyncController {
   constructor(private readonly service: SyncService) {}
