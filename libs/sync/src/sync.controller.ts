@@ -12,7 +12,7 @@ export class SyncController {
     type: TrackerInfo,
     description: "Get current tracker running status quo",
   })
-  @Get("/getTrackerInfo")
+  @Get("/trackerInfo")
   async getTrackerInfo(): Promise<TrackerInfo> {
     const dbTip = assert(
       await this.service.getBlockHeader({

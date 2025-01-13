@@ -109,9 +109,12 @@ export class UdtService {
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, {
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    return await parseScriptMode(script, this.client, [
+      {
+        rgbppCodeHash: this.rgbppBtcCodeHash,
+        rgbppHashType: this.rgbppBtcHashType,
+        mode: ScriptMode.RgbppBtc,
+      },
+    ]);
   }
 }

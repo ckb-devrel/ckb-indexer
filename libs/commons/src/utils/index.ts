@@ -127,23 +127,30 @@ export async function parseScriptModeFromAddress(
     const ckbAddress = await ccc.Address.fromString(address, client);
     return await parseScriptMode(ckbAddress.script, client);
   } else {
-    return ScriptMode.Rgbpp;
+    return ScriptMode.RgbppBtc;
   }
 }
 
 export async function parseScriptMode(
   script: ccc.ScriptLike,
   client: ccc.Client,
-  rgbpp?: {
-    rgbppBtcCodeHash: ccc.Hex;
-    rgbppBtcHashType: ccc.HashType;
-  },
+  rgbpp?: [
+    {
+      rgbppCodeHash: ccc.Hex;
+      rgbppHashType: ccc.HashType;
+      mode: ScriptMode;
+    },
+  ],
 ): Promise<ScriptMode> {
-  if (
-    script.codeHash === rgbpp?.rgbppBtcCodeHash &&
-    script.hashType === rgbpp?.rgbppBtcHashType
-  ) {
-    return ScriptMode.Rgbpp;
+  if (rgbpp) {
+    for (const { rgbppCodeHash, rgbppHashType, mode } of rgbpp) {
+      if (
+        script.codeHash === rgbppCodeHash &&
+        script.hashType === rgbppHashType
+      ) {
+        return mode;
+      }
+    }
   }
   const paris = {
     [ccc.KnownScript.SingleUseLock]: ScriptMode.SingleUseLock,
@@ -186,61 +193,51 @@ export async function parseScriptMode(
   return ScriptMode.Unknown;
 }
 
-export async function parseAddress(
-  scriptLike: ccc.ScriptLike,
-  client: ccc.Client,
-  rgbpp?: {
-    btcRequester: AxiosInstance;
-    rgbppBtcCodeHash: ccc.Hex;
-    rgbppBtcHashType: ccc.HashType;
-  },
-  logger?: Logger,
-): Promise<string> {
-  const script = ccc.Script.from(scriptLike);
+export async function parseDogeAddress() {
+  throw new Error("Not implemented");
+}
+
+export async function parseBtcAddress(params: {
+  client: ccc.Client;
+  rgbppScript: ccc.ScriptLike;
+  requester: AxiosInstance;
+  logger?: Logger;
+}): Promise<string> {
+  const { client, rgbppScript, requester, logger } = params;
+  const script = ccc.Script.from(rgbppScript);
   const ckbAddress = ccc.Address.fromScript(script, client).toString();
 
-  if (
-    script.codeHash === rgbpp?.rgbppBtcCodeHash &&
-    script.hashType === rgbpp?.rgbppBtcHashType
-  ) {
-    const decoded = (() => {
-      try {
-        return RgbppLockArgs.decode(script.args);
-      } catch (err) {
-        return undefined;
-      }
-    })();
-    if (!decoded) {
-      return ckbAddress;
+  const decoded = (() => {
+    try {
+      return RgbppLockArgs.decode(script.args);
+    } catch (err) {
+      return undefined;
     }
-
-    const { outIndex, txId } = decoded;
-    const { data } = await rgbpp?.btcRequester.post("/", {
-      method: "getrawtransaction",
-      params: [txId.slice(2), true],
-    });
-
-    const error = data?.error ? JSON.stringify(data?.error) : undefined;
-    if (
-      error !== undefined &&
-      // From BTC core
-      !error?.includes("No such mempool or blockchain transaction.") &&
-      // From Ankr's BTC rpc
-      !error?.includes(
-        "Retry failed, reason: Node responded with non success status code",
-      )
-    ) {
-      throw data.error;
-    }
-
-    if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-      logger?.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
-      return ckbAddress;
-    }
-    return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
+  })();
+  if (!decoded) {
+    return ckbAddress;
   }
 
-  return ckbAddress;
+  const { outIndex, txId } = decoded;
+  const { data } = await requester.post("/", {
+    method: "getrawtransaction",
+    params: [txId.slice(2), true],
+  });
+
+  if (
+    data?.error &&
+    !JSON.stringify(data?.error).includes(
+      "No such mempool or blockchain transaction.",
+    )
+  ) {
+    throw data.error;
+  }
+
+  if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+    logger?.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
+    return ckbAddress;
+  }
+  return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
 }
 
 export function extractIsomorphicInfo(
