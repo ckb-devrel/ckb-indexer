@@ -94,12 +94,21 @@ export class CellService {
         },
       });
       for await (const tx of spentTxs) {
-        if (tx.isInput) {
+        if (!tx.isInput) {
+          continue;
+        }
+        const maybeConsumerTx = await this.client.getTransaction(tx.txHash);
+        if (
+          maybeConsumerTx &&
+          maybeConsumerTx.transaction.inputs.some(
+            (input) => input.previousOutput === cell.outPoint,
+          )
+        ) {
           return {
             cell,
             spender: ccc.OutPoint.from({
               txHash: tx.txHash,
-              index: tx.txIndex,
+              index: tx.cellIndex,
             }),
           };
         }
@@ -145,12 +154,12 @@ export class CellService {
       if (tx.isInput) {
         spender = ccc.OutPoint.from({
           txHash: tx.txHash,
-          index: tx.txIndex,
+          index: tx.cellIndex,
         });
       } else {
         spentCell = await this.client.getCell({
           txHash: tx.txHash,
-          index: tx.txIndex,
+          index: tx.cellIndex,
         });
       }
     }
