@@ -79,15 +79,24 @@ export const RpcErrorMessage: Record<RpcError, string> = {
   [RpcError.SporeNotFound]: "Spore not found",
 };
 
+export class ApiError {
+  name = "Api Error";
+  message: string;
+
+  constructor(message: string) {
+    this.message = message;
+  }
+}
+
 export function assert<T>(
   expression: T | undefined | null,
   message: string | RpcError,
 ): T {
   if (!expression) {
     if (typeof message === "string") {
-      throw new Error(message);
+      throw new ApiError(message);
     } else {
-      throw new Error(RpcErrorMessage[message]);
+      throw new ApiError(RpcErrorMessage[message]);
     }
   }
   return expression;
@@ -134,27 +143,22 @@ export async function parseScriptModeFromAddress(
 export async function parseScriptMode(
   script: ccc.ScriptLike,
   client: ccc.Client,
-  rgbpp?: [
-    {
-      rgbppCodeHash: ccc.Hex;
-      rgbppHashType: ccc.HashType;
-      mode: ScriptMode;
-    },
-  ],
+  extension?: {
+    codeHash: ccc.Hex;
+    hashType: ccc.HashType;
+    mode: ScriptMode;
+  }[],
 ): Promise<ScriptMode> {
-  if (rgbpp) {
-    for (const { rgbppCodeHash, rgbppHashType, mode } of rgbpp) {
-      if (
-        script.codeHash === rgbppCodeHash &&
-        script.hashType === rgbppHashType
-      ) {
+  if (extension) {
+    for (const { codeHash, hashType, mode } of extension) {
+      if (script.codeHash === codeHash && script.hashType === hashType) {
         return mode;
       }
     }
   }
   const paris = {
     [ccc.KnownScript.SingleUseLock]: ScriptMode.SingleUseLock,
-    [ccc.KnownScript.XUdt]: ScriptMode.Xudt,
+    [ccc.KnownScript.XUdt]: ScriptMode.Udt,
     [ccc.KnownScript.AnyoneCanPay]: ScriptMode.Acp,
     [ccc.KnownScript.Secp256k1Blake160]: ScriptMode.Secp256k1,
     [ccc.KnownScript.JoyId]: ScriptMode.JoyId,

@@ -45,8 +45,8 @@ export class CellService {
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
     return await parseScriptMode(script, this.client, [
       {
-        rgbppCodeHash: this.rgbppBtcCodeHash,
-        rgbppHashType: this.rgbppBtcHashType,
+        codeHash: this.rgbppBtcCodeHash,
+        hashType: this.rgbppBtcHashType,
         mode: ScriptMode.RgbppBtc,
       },
     ]);
@@ -79,29 +79,43 @@ export class CellService {
   > {
     const cell = await this.client.getCell({ txHash, index });
     if (cell) {
+      // If the cell is not an asset, skip finding the spender
+      if (cell.cellOutput.type === undefined) {
+        return {
+          cell,
+        };
+      }
       const liveCell = await this.client.getCellLive({ txHash, index }, true);
       if (liveCell) {
         return {
           cell: liveCell,
         };
       }
-      const spentTxs = this.client.findTransactions({
-        script: cell.cellOutput.lock,
-        scriptType: "lock",
-        scriptSearchMode: "exact",
-        filter: {
-          script: cell.cellOutput.type,
+      const cellTx = await this.client.getTransaction(cell.outPoint.txHash);
+      if (cellTx === undefined) {
+        return;
+      }
+      const spentTxs = this.client.findTransactions(
+        {
+          script: cell.cellOutput.lock,
+          scriptType: "lock",
+          scriptSearchMode: "exact",
+          filter: {
+            script: cell.cellOutput.type,
+          },
         },
-      });
+        "desc",
+        10,
+      );
       for await (const tx of spentTxs) {
-        if (!tx.isInput) {
+        if (!tx.isInput || tx.blockNumber < (cellTx.blockNumber ?? 0n)) {
           continue;
         }
         const maybeConsumerTx = await this.client.getTransaction(tx.txHash);
         if (
           maybeConsumerTx &&
-          maybeConsumerTx.transaction.inputs.some(
-            (input) => input.previousOutput === cell.outPoint,
+          maybeConsumerTx.transaction.inputs.some((input) =>
+            input.previousOutput.eq(cell.outPoint),
           )
         ) {
           return {
@@ -113,6 +127,10 @@ export class CellService {
           };
         }
       }
+      console.log("no spender found");
+      return {
+        cell,
+      };
     }
   }
 

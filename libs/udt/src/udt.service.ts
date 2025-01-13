@@ -101,18 +101,18 @@ export class UdtService {
     address: string,
     tokenId?: ccc.HexLike,
   ): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenByAddress(address, tokenId);
+    return await this.udtBalanceRepo.getTokenItemsByAddress(address, tokenId);
   }
 
   async getTokenAllBalances(tokenId: ccc.HexLike): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenByTokenId(tokenId);
+    return await this.udtBalanceRepo.getTokenItemsByTokenId(tokenId);
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
     return await parseScriptMode(script, this.client, [
       {
-        rgbppCodeHash: this.rgbppBtcCodeHash,
-        rgbppHashType: this.rgbppBtcHashType,
+        codeHash: this.rgbppBtcCodeHash,
+        hashType: this.rgbppBtcHashType,
         mode: ScriptMode.RgbppBtc,
       },
     ]);
