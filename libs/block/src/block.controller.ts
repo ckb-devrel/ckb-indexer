@@ -1,6 +1,6 @@
 import { assert, BlockHeader, parseSortableInt, RpcError } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { BlockService } from "./block.service";
 
@@ -12,7 +12,7 @@ export class BlockController {
     type: BlockHeader,
     description: "Get tip block",
   })
-  @Get("/block/latest")
+  @Get("/blocks/latest")
   async getLatestBlock(): Promise<BlockHeader> {
     const tipHeader = assert(
       await this.service.getBlockHeader({
@@ -33,9 +33,9 @@ export class BlockController {
     type: BlockHeader,
     description: "Get block by block number",
   })
-  @Get("/block?number=:blockNumber")
+  @Get("/blocks/by-number/:blockNumber")
   async getBlockHeaderByNumber(
-    @Query("blockNumber") blockNumber: number,
+    @Param("blockNumber") blockNumber: number,
   ): Promise<BlockHeader> {
     const blockHeader = assert(
       await this.service.getBlockHeader({

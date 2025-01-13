@@ -231,7 +231,7 @@ export class AssetController {
     description:
       "Query a list of assets in the cell from a transaction by TxHash",
   })
-  @Get("/assetCells?txHash=:txHash")
+  @Get("/assetCells")
   async queryTxAssetCellDataByTxHash(
     @Query("txHash") txHash: string,
   ): Promise<TxAssetCellData> {
@@ -246,7 +246,7 @@ export class AssetController {
     type: TxAssetCellData,
     description: "Query a list of assets in the cell from a block by BlockHash",
   })
-  @Get("/assetCells?blockHash=:blockHash")
+  @Get("/assetCells")
   async queryTxAssetCellDataListByBlockHash(
     @Query("blockHash") blockHash: string,
   ): Promise<TxAssetCellData[]> {
