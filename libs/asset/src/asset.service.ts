@@ -107,7 +107,16 @@ export class AssetService {
       },
     });
     for await (const tx of spentTxs) {
-      if (tx.isInput) {
+      if (!tx.isInput) {
+        continue;
+      }
+      const maybeConsumerTx = await this.client.getTransaction(tx.txHash);
+      if (
+        maybeConsumerTx &&
+        maybeConsumerTx.transaction.inputs.some(
+          (input) => input.previousOutput === cell.outPoint,
+        )
+      ) {
         return tx.txHash;
       }
     }

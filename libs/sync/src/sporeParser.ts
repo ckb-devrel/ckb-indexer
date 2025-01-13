@@ -290,6 +290,9 @@ class SporeParser {
         updatedAtHeight: formatSortableInt(this.blockHeight),
       });
       await sporeRepo.save(spore);
+      this.context.logger.log(
+        `Mint Spore ${sporeId} at tx ${txHash}`,
+      );
     }
 
     if (transfer) {
