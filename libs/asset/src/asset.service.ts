@@ -1,6 +1,6 @@
 import {
   assertConfig,
-  parseAddress,
+  parseBtcAddress,
   parseScriptMode,
   ScriptMode,
 } from "@app/commons";
@@ -17,6 +17,10 @@ export class AssetService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
+  private readonly udtTypes: {
+    codeHash: ccc.HexLike;
+    hashType: ccc.HashTypeLike;
+  }[];
   private readonly btcRequester: AxiosInstance;
 
   constructor(
@@ -42,21 +46,41 @@ export class AssetService {
     this.btcRequester = axios.create({
       baseURL: btcRpcUri,
     });
+
+    const udtTypes =
+      configService.get<
+        { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
+      >("sync.udtTypes") ?? [];
+    this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, {
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
+    const extension = this.udtTypes.map((t) => ({
+      codeHash: ccc.hexFrom(t.codeHash),
+      hashType: ccc.hashTypeFrom(t.hashType),
+      mode: ScriptMode.Udt,
+    }));
+    extension.push({
+      codeHash: this.rgbppBtcCodeHash,
+      hashType: this.rgbppBtcHashType,
+      mode: ScriptMode.RgbppBtc,
     });
+    return await parseScriptMode(script, this.client, extension);
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(scriptLike, this.client, {
-      btcRequester: this.btcRequester,
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
   }
 
   async getTransactionWithBlockByTxHash(txHash: string): Promise<
@@ -84,20 +108,41 @@ export class AssetService {
   }
 
   async checkCellConsumed(cell: ccc.Cell): Promise<ccc.Hex | undefined> {
+    // If the cell is not an asset, skip finding the spender
+    if (cell.cellOutput.type === undefined) {
+      return;
+    }
     const liveCell = await this.client.getCellLive(cell.outPoint);
     if (liveCell) {
       return;
     }
-    const spentTxs = this.client.findTransactions({
-      script: cell.cellOutput.lock,
-      scriptType: "lock",
-      scriptSearchMode: "exact",
-      filter: {
-        script: cell.cellOutput.type,
+    const cellTx = await this.client.getTransaction(cell.outPoint.txHash);
+    if (cellTx === undefined) {
+      return;
+    }
+    const spentTxs = this.client.findTransactions(
+      {
+        script: cell.cellOutput.lock,
+        scriptType: "lock",
+        scriptSearchMode: "exact",
+        filter: {
+          script: cell.cellOutput.type,
+        },
       },
-    });
+      "desc",
+      10,
+    );
     for await (const tx of spentTxs) {
-      if (tx.isInput) {
+      if (!tx.isInput || tx.blockNumber < (cellTx.blockNumber ?? 0n)) {
+        continue;
+      }
+      const maybeConsumerTx = await this.client.getTransaction(tx.txHash);
+      if (
+        maybeConsumerTx &&
+        maybeConsumerTx.transaction.inputs.some((input) =>
+          input.previousOutput.eq(cell.outPoint),
+        )
+      ) {
         return tx.txHash;
       }
     }
@@ -150,7 +195,7 @@ export class AssetService {
       cells.map(async (cell) => {
         return {
           cell,
-          spenderTx: await this.checkCellConsumed(cell),
+          spenderTx: undefined, //await this.checkCellConsumed(cell),
         };
       }),
     );
@@ -167,7 +212,7 @@ export class AssetService {
       return;
     }
     const mode = await this.scriptMode(cell.cellOutput.type);
-    if (mode !== ScriptMode.Xudt) {
+    if (mode !== ScriptMode.Udt) {
       return;
     }
     const tokenHash = cell.cellOutput.type.hash();

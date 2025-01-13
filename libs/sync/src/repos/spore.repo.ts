@@ -7,4 +7,9 @@ export class SporeRepo extends Repository<Spore> {
   constructor(manager: EntityManager) {
     super(Spore, manager);
   }
+
+  async getDobBySporeId(sporeId: string): Promise<string | undefined> {
+    const spore = await this.findOne({ where: { sporeId } });
+    return spore?.dobDecoded;
+  }
 }

@@ -1,16 +1,17 @@
 import {
   assertConfig,
   formatSortableInt,
-  parseAddress,
+  parseBtcAddress,
   parseScriptMode,
   ScriptMode,
   withTransaction,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
 import { cccA } from "@ckb-ccc/shell/advanced";
+import { spore } from "@ckb-ccc/spore";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { Axios, AxiosInstance } from "axios";
+import axios, { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
 import { ClusterRepo } from "./repos/cluster.repo";
 import { SporeRepo } from "./repos/spore.repo";
@@ -28,6 +29,7 @@ export class SporeParserBuilder {
   constructor(
     configService: ConfigService,
     public readonly entityManager: EntityManager,
+    public readonly sporeRepo: SporeRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -49,6 +51,25 @@ export class SporeParserBuilder {
 
   build(blockHeight: ccc.NumLike): SporeParser {
     return new SporeParser(this, ccc.numFrom(blockHeight));
+  }
+
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
+  }
+
+  async getDobDecodedBySporeId(sporeId: ccc.Hex): Promise<string | undefined> {
+    return await this.sporeRepo.getDobBySporeId(sporeId);
   }
 }
 
@@ -89,19 +110,6 @@ class SporeParser {
     public readonly blockHeight: ccc.Num,
   ) {}
 
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(
-      scriptLike,
-      this.context.client,
-      {
-        btcRequester: this.context.btcRequester,
-        rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
-        rgbppBtcHashType: this.context.rgbppBtcHashType,
-      },
-      this.context.logger,
-    );
-  }
-
   async analyzeFlow(
     tx: ccc.Transaction,
     mode: ScriptMode,
@@ -121,7 +129,7 @@ class SporeParser {
       if (expectedMode !== mode) {
         continue;
       }
-      const address = await this.scriptToAddress(cellOutput.lock);
+      const address = await this.context.scriptToAddress(cellOutput.lock);
       const sporeOrClusterId = cellOutput.type.args;
       flows[sporeOrClusterId] = {
         asset: {
@@ -146,7 +154,7 @@ class SporeParser {
       if (expectedMode !== mode) {
         continue;
       }
-      const address = await this.scriptToAddress(output.lock);
+      const address = await this.context.scriptToAddress(output.lock);
       const sporeOrClusterId = output.type.args;
       const burnSpore = flows[sporeOrClusterId];
       if (burnSpore) {
@@ -196,38 +204,6 @@ class SporeParser {
     return flows;
   }
 
-  async decodeDob(
-    url: string,
-    sporeData: ccc.Hex,
-    clusterData: ccc.Hex,
-  ): Promise<string> {
-    const axios = new Axios({
-      baseURL: url,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    const result = await axios.post(
-      "/",
-      JSON.stringify({
-        id: 0,
-        jsonrpc: "2.0",
-        method: "dob_raw_decode",
-        params: [sporeData, clusterData],
-      }),
-    );
-    const decoderResult = JSON.parse(result.data);
-    if ("error" in decoderResult) {
-      throw new Error(
-        `Decode DOB failed: ${JSON.stringify(decoderResult.error)}`,
-      );
-    }
-    const renderResult = JSON.parse(decoderResult.result);
-    const renderOutput = JSON.parse(renderResult.render_output);
-    return renderOutput;
-  }
-
   async parseSporeData(sporeId: ccc.Hex, data: ccc.Hex): Promise<SporeDetail> {
     const sporeData = cccA.sporeA.unpackToRawSporeData(data);
     const decoded = {
@@ -248,12 +224,16 @@ class SporeParser {
         );
       }
       try {
-        const dobDecoded = await this.decodeDob(
-          this.context.decoderUri,
-          data,
-          cluster.cell.outputData,
-        );
-        Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
+        let dobDecoded = await this.context.getDobDecodedBySporeId(sporeId);
+        if (dobDecoded === undefined) {
+          const dobRenderOutput = await spore.dob.decodeDobByRawData(
+            data,
+            cluster.cell.outputData,
+            this.context.decoderUri,
+          );
+          dobDecoded = JSON.stringify(dobRenderOutput);
+        }
+        Object.assign(decoded, { dobDecoded });
       } catch (error) {
         this.context.logger.warn(`Spore ${sporeId}: ${error}`);
       }
@@ -310,6 +290,7 @@ class SporeParser {
         updatedAtHeight: formatSortableInt(this.blockHeight),
       });
       await sporeRepo.save(spore);
+      this.context.logger.log(`Mint Spore ${sporeId} at tx ${txHash}`);
     }
 
     if (transfer) {

@@ -2,7 +2,7 @@ import {
   assertConfig,
   formatSortable,
   formatSortableInt,
-  parseAddress,
+  parseBtcAddress,
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
@@ -509,15 +509,17 @@ export class UdtParser {
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(
-      scriptLike,
-      this.client,
-      {
-        btcRequester: this.btcRequester,
-        rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-        rgbppBtcHashType: this.rgbppBtcHashType,
-      },
-      this.logger,
-    );
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
   }
 }

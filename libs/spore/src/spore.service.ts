@@ -1,4 +1,4 @@
-import { assertConfig, parseAddress } from "@app/commons";
+import { assertConfig, parseBtcAddress } from "@app/commons";
 import { Cluster, Spore } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Injectable, Logger } from "@nestjs/common";
@@ -39,11 +39,18 @@ export class SporeService {
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(scriptLike, this.client, {
-      btcRequester: this.btcRequester,
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
   }
 
   async getItemsCountOfCluster(clusterId: ccc.HexLike): Promise<number> {

@@ -1,8 +1,11 @@
 import {
+  ApiError,
   assert,
   asyncMap,
+  Chain,
   EventType,
   extractIsomorphicInfo,
+  IsomorphicBinding,
   RpcError,
   ScriptMode,
   TxAssetCellData,
@@ -13,6 +16,10 @@ import { Controller, Get, Param } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { AssetService } from "./asset.service";
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 @Controller()
 export class AssetController {
   constructor(private readonly service: AssetService) {}
@@ -22,23 +29,37 @@ export class AssetController {
     index: number,
     eventType: EventType,
   ): Promise<TxAssetCellDetail> {
+    const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     const scriptMode = await this.service.scriptMode(cell.cellOutput.lock);
-    const isomorphicInfo =
-      scriptMode === ScriptMode.Rgbpp
-        ? extractIsomorphicInfo(cell.cellOutput.lock)
-        : undefined;
+    const isomorphicInfo = extractIsomorphicInfo(cell.cellOutput.lock);
+    let isomorphicBinding: IsomorphicBinding | undefined = undefined;
+    if (isomorphicInfo) {
+      switch (scriptMode) {
+        case ScriptMode.RgbppBtc:
+          {
+            isomorphicBinding = {
+              chain: Chain.Btc,
+              txHash: ccc.hexFrom(isomorphicInfo.txHash),
+              index: Number(isomorphicInfo.index),
+            };
+          }
+          break;
+        case ScriptMode.RgbppDoge: {
+          isomorphicBinding = {
+            chain: Chain.Doge,
+            txHash: ccc.hexFrom(isomorphicInfo.txHash),
+            index: Number(isomorphicInfo.index),
+          };
+        }
+      }
+    }
     const cellAsset: TxAssetCellDetail = {
       index,
       capacity: cell.cellOutput.capacity,
       eventType,
       address: await this.service.scriptToAddress(cell.cellOutput.lock),
-      typeScriptType: scriptMode,
-      isomorphicBtcTx: isomorphicInfo?.txHash
-        ? ccc.hexFrom(isomorphicInfo.txHash)
-        : undefined,
-      isomorphicBtcTxVout: isomorphicInfo?.index
-        ? Number(isomorphicInfo.index)
-        : undefined,
+      typeCodeName: await this.service.scriptMode(typeScript),
+      rgbppBinding: isomorphicBinding,
     };
 
     const token = await this.service.getTokenFromCell(cell);
@@ -104,6 +125,9 @@ export class AssetController {
 
     const inputCells = await this.service.extractCellsFromTxInputs(tx);
     for (const [index, input] of inputCells.entries()) {
+      if (input.cell.cellOutput.type === undefined) {
+        continue;
+      }
       const cellAsset = await this.extractCellAssetFromCell(
         input.cell,
         index,
@@ -132,6 +156,9 @@ export class AssetController {
 
     const outputCells = await this.service.extractCellsFromTxOutputs(tx);
     for (const [index, output] of outputCells.entries()) {
+      if (output.cell.cellOutput.type === undefined) {
+        continue;
+      }
       const cellAsset = await this.extractCellAssetFromCell(
         output.cell,
         index,
@@ -140,7 +167,7 @@ export class AssetController {
       if (cellAsset.nftData) {
         const nftIndex = txAssetData.inputs.findIndex(
           (input) =>
-            input.nftData?.tokenId === cellAsset.nftData?.tokenId ||
+            input.nftData?.tokenId === cellAsset.nftData?.tokenId &&
             input.nftData?.clusterId === cellAsset.nftData?.clusterId,
         );
         if (nftIndex >= 0) {
@@ -216,38 +243,52 @@ export class AssetController {
     description:
       "Query a list of assets in the cell from a transaction by TxHash",
   })
-  @Get("/queryTxAssetCellDataByTxHash")
+  @Get("/assetCells/by-transaction/:txHash")
   async queryTxAssetCellDataByTxHash(
     @Param("txHash") txHash: string,
-  ): Promise<TxAssetCellData> {
-    const { tx, blockHash, blockNumber } = assert(
-      await this.service.getTransactionWithBlockByTxHash(txHash),
-      RpcError.TxNotFound,
-    );
-    return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
+  ): Promise<TxAssetCellData | ApiError> {
+    try {
+      const { tx, blockHash, blockNumber } = assert(
+        await this.service.getTransactionWithBlockByTxHash(txHash),
+        RpcError.TxNotFound,
+      );
+      return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return e;
+      }
+      throw e;
+    }
   }
 
   @ApiOkResponse({
     type: TxAssetCellData,
     description: "Query a list of assets in the cell from a block by BlockHash",
   })
-  @Get("/queryTxAssetCellDataListByBlockHash")
+  @Get("/assetCells/by-block/:blockHash")
   async queryTxAssetCellDataListByBlockHash(
     @Param("blockHash") blockHash: string,
-  ): Promise<TxAssetCellData[]> {
-    const block = assert(
-      await this.service.getBlockByBlockHash(blockHash),
-      RpcError.BlockNotFound,
-    );
-    const txAssetCellDataList: TxAssetCellData[] = [];
-    await asyncMap(block.transactions, async (tx) => {
-      const txAssetCellData = await this.extractTxAssetFromTx(
-        tx,
-        block.header.hash,
-        block.header.number,
+  ): Promise<TxAssetCellData[] | ApiError> {
+    try {
+      const block = assert(
+        await this.service.getBlockByBlockHash(blockHash),
+        RpcError.BlockNotFound,
       );
-      txAssetCellDataList.push(txAssetCellData);
-    });
-    return txAssetCellDataList;
+      const txAssetCellDataList: TxAssetCellData[] = [];
+      await asyncMap(block.transactions, async (tx) => {
+        const txAssetCellData = await this.extractTxAssetFromTx(
+          tx,
+          block.header.hash,
+          block.header.number,
+        );
+        txAssetCellDataList.push(txAssetCellData);
+      });
+      return txAssetCellDataList;
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return e;
+      }
+      throw e;
+    }
   }
 }

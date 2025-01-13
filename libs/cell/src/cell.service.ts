@@ -1,6 +1,6 @@
 import {
   assertConfig,
-  parseAddress,
+  parseBtcAddress,
   parseScriptMode,
   RgbppLockArgs,
   ScriptMode,
@@ -43,18 +43,28 @@ export class CellService {
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, {
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    return await parseScriptMode(script, this.client, [
+      {
+        codeHash: this.rgbppBtcCodeHash,
+        hashType: this.rgbppBtcHashType,
+        mode: ScriptMode.RgbppBtc,
+      },
+    ]);
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(scriptLike, this.client, {
-      btcRequester: this.btcRequester,
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
   }
 
   async getCellByOutpoint(
@@ -69,31 +79,58 @@ export class CellService {
   > {
     const cell = await this.client.getCell({ txHash, index });
     if (cell) {
+      // If the cell is not an asset, skip finding the spender
+      if (cell.cellOutput.type === undefined) {
+        return {
+          cell,
+        };
+      }
       const liveCell = await this.client.getCellLive({ txHash, index }, true);
       if (liveCell) {
         return {
           cell: liveCell,
         };
       }
-      const spentTxs = this.client.findTransactions({
-        script: cell.cellOutput.lock,
-        scriptType: "lock",
-        scriptSearchMode: "exact",
-        filter: {
-          script: cell.cellOutput.type,
+      const cellTx = await this.client.getTransaction(cell.outPoint.txHash);
+      if (cellTx === undefined) {
+        return;
+      }
+      const spentTxs = this.client.findTransactions(
+        {
+          script: cell.cellOutput.lock,
+          scriptType: "lock",
+          scriptSearchMode: "exact",
+          filter: {
+            script: cell.cellOutput.type,
+          },
         },
-      });
+        "desc",
+        10,
+      );
       for await (const tx of spentTxs) {
-        if (tx.isInput) {
+        if (!tx.isInput || tx.blockNumber < (cellTx.blockNumber ?? 0n)) {
+          continue;
+        }
+        const maybeConsumerTx = await this.client.getTransaction(tx.txHash);
+        if (
+          maybeConsumerTx &&
+          maybeConsumerTx.transaction.inputs.some((input) =>
+            input.previousOutput.eq(cell.outPoint),
+          )
+        ) {
           return {
             cell,
             spender: ccc.OutPoint.from({
               txHash: tx.txHash,
-              index: tx.txIndex,
+              index: tx.cellIndex,
             }),
           };
         }
       }
+      console.log("no spender found");
+      return {
+        cell,
+      };
     }
   }
 
@@ -135,12 +172,12 @@ export class CellService {
       if (tx.isInput) {
         spender = ccc.OutPoint.from({
           txHash: tx.txHash,
-          index: tx.txIndex,
+          index: tx.cellIndex,
         });
       } else {
         spentCell = await this.client.getCell({
           txHash: tx.txHash,
-          index: tx.txIndex,
+          index: tx.cellIndex,
         });
       }
     }
@@ -199,5 +236,49 @@ export class CellService {
       }
     }
     return cells.slice(0, limit);
+  }
+
+  async getPagedTokenCellsByCursor(
+    tokenId: string,
+    address: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<{
+    cells: ccc.Cell[];
+    cursor: string;
+  }> {
+    const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
+    if (!udtInfo) {
+      return {
+        cells: [],
+        cursor: "",
+      };
+    }
+
+    const lockScript = (await ccc.Address.fromString(address, this.client))
+      .script;
+    const typeScript: ccc.ScriptLike = {
+      codeHash: udtInfo.typeCodeHash,
+      hashType: udtInfo.typeCodeHash,
+      args: udtInfo.typeArgs,
+    };
+
+    const result = await this.client.findCellsPaged(
+      {
+        script: lockScript,
+        scriptType: "lock",
+        scriptSearchMode: "exact",
+        filter: {
+          script: typeScript,
+        },
+      },
+      "asc",
+      limit,
+      cursor,
+    );
+    return {
+      cells: result.cells,
+      cursor: result.lastCursor,
+    };
   }
 }
