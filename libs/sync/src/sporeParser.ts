@@ -8,9 +8,10 @@ import {
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
 import { cccA } from "@ckb-ccc/shell/advanced";
+import { spore } from "@ckb-ccc/spore";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { Axios, AxiosInstance } from "axios";
+import axios, { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
 import { ClusterRepo } from "./repos/cluster.repo";
 import { SporeRepo } from "./repos/spore.repo";
@@ -203,38 +204,6 @@ class SporeParser {
     return flows;
   }
 
-  async decodeDob(
-    url: string,
-    sporeData: ccc.Hex,
-    clusterData: ccc.Hex,
-  ): Promise<string> {
-    const axios = new Axios({
-      baseURL: url,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    const result = await axios.post(
-      "/",
-      JSON.stringify({
-        id: 0,
-        jsonrpc: "2.0",
-        method: "dob_raw_decode",
-        params: [sporeData, clusterData],
-      }),
-    );
-    const decoderResult = JSON.parse(result.data);
-    if ("error" in decoderResult) {
-      throw new Error(
-        `Decode DOB failed: ${JSON.stringify(decoderResult.error)}`,
-      );
-    }
-    const renderResult = JSON.parse(decoderResult.result);
-    const renderOutput = JSON.parse(renderResult.render_output);
-    return renderOutput;
-  }
-
   async parseSporeData(sporeId: ccc.Hex, data: ccc.Hex): Promise<SporeDetail> {
     const sporeData = cccA.sporeA.unpackToRawSporeData(data);
     const decoded = {
@@ -257,13 +226,14 @@ class SporeParser {
       try {
         let dobDecoded = await this.context.getDobDecodedBySporeId(sporeId);
         if (dobDecoded === undefined) {
-          dobDecoded = await this.decodeDob(
-            this.context.decoderUri,
+          const dobRenderOutput = await spore.dob.decodeDobByRawData(
             data,
             cluster.cell.outputData,
+            this.context.decoderUri,
           );
+          dobDecoded = JSON.stringify(dobRenderOutput);
         }
-        Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
+        Object.assign(decoded, { dobDecoded });
       } catch (error) {
         this.context.logger.warn(`Spore ${sporeId}: ${error}`);
       }

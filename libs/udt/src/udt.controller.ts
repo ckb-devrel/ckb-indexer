@@ -10,9 +10,13 @@ import {
 } from "@app/commons";
 import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { UdtService } from "./udt.service";
+
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
 
 @Controller()
 export class UdtController {
@@ -89,10 +93,10 @@ export class UdtController {
     description:
       "Get detailed token balances of an address, filtered by tokenId if provided",
   })
-  @Get("/tokens/balances/:address/:tokenId?")
+  @Get("/tokens/balances/:address")
   async getTokenBalances(
     @Param("address") address: string,
-    @Param("tokenId") tokenId?: string,
+    @Query("tokenId") tokenId?: string,
   ): Promise<TokenBalance[]> {
     const udtBalances = await this.service.getTokenBalance(address, tokenId);
     return await asyncMap(udtBalances, this.udtBalanceToTokenBalance);
@@ -102,7 +106,7 @@ export class UdtController {
     type: [TokenBalance],
     description: "Filter all token holders by tokenId",
   })
-  @Get("/tokens/holders/:tokenId")
+  @Get("/tokens/:tokenId/holders")
   async getTokenHolders(
     @Param("tokenId") tokenId: string,
   ): Promise<TokenBalance[]> {

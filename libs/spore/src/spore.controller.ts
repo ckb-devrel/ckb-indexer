@@ -4,6 +4,10 @@ import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { SporeService } from "./spore.service";
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 @Controller()
 export class SporeController {
   constructor(private readonly service: SporeService) {}

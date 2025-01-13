@@ -11,9 +11,13 @@ import {
   TxAssetCellDetail,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { AssetService } from "./asset.service";
+
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
 
 @Controller()
 export class AssetController {
@@ -231,9 +235,9 @@ export class AssetController {
     description:
       "Query a list of assets in the cell from a transaction by TxHash",
   })
-  @Get("/assetCells")
+  @Get("/assetCells/by-transaction/:txHash")
   async queryTxAssetCellDataByTxHash(
-    @Query("txHash") txHash: string,
+    @Param("txHash") txHash: string,
   ): Promise<TxAssetCellData> {
     const { tx, blockHash, blockNumber } = assert(
       await this.service.getTransactionWithBlockByTxHash(txHash),
@@ -246,9 +250,9 @@ export class AssetController {
     type: TxAssetCellData,
     description: "Query a list of assets in the cell from a block by BlockHash",
   })
-  @Get("/assetCells")
+  @Get("/assetCells/by-block/:blockHash")
   async queryTxAssetCellDataListByBlockHash(
-    @Query("blockHash") blockHash: string,
+    @Param("blockHash") blockHash: string,
   ): Promise<TxAssetCellData[]> {
     const block = assert(
       await this.service.getBlockByBlockHash(blockHash),

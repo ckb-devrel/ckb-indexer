@@ -14,6 +14,10 @@ import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { CellService } from "./cell.service";
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 @Controller()
 export class CellController {
   constructor(private readonly service: CellService) {}
@@ -111,18 +115,18 @@ export class CellController {
     type: [TokenCell],
     description: "Get paged tokens under a user CKB address",
   })
-  @Get("/cells/:tokenId/:address/:limit")
+  @Get("/cells/:tokenId/:address")
   async getUserTokenCells(
     @Param("tokenId") tokenId: string,
     @Param("address") address: string,
-    @Param("limit") limit: number,
+    @Query("limit") limit?: number,
     @Query("cursor") cursor?: string,
   ): Promise<PagedTokenResult> {
     const { cells, cursor: lastCursor } =
       await this.service.getPagedTokenCellsByCursor(
         tokenId,
         address,
-        limit,
+        limit ?? 10,
         cursor,
       );
     return {

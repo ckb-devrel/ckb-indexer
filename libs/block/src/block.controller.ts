@@ -1,8 +1,12 @@
 import { assert, BlockHeader, parseSortableInt, RpcError } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { BlockService } from "./block.service";
+
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
 
 @Controller()
 export class BlockController {
