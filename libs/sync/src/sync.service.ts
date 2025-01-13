@@ -386,7 +386,7 @@ export class SyncService {
 
         this.syncedBlocks += 1;
 
-        if (this.syncedBlocks % 1000 === 0) {
+        if (this.syncedBlocks % 1000 === 0 || height === endBlock) {
           const syncedBlockTime = this.syncedBlockTime + Date.now() - tipTime;
           const blocksDiff = Number(tip - endBlock);
           const syncCost = syncedBlockTime / this.syncedBlocks;
