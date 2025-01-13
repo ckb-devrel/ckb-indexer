@@ -1,6 +1,6 @@
 import {
   assertConfig,
-  parseAddress,
+  parseBtcAddress,
   parseScriptMode,
   RgbppLockArgs,
   ScriptMode,
@@ -43,18 +43,28 @@ export class CellService {
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, {
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    return await parseScriptMode(script, this.client, [
+      {
+        rgbppCodeHash: this.rgbppBtcCodeHash,
+        rgbppHashType: this.rgbppBtcHashType,
+        mode: ScriptMode.RgbppBtc,
+      },
+    ]);
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(scriptLike, this.client, {
-      btcRequester: this.btcRequester,
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
   }
 
   async getCellByOutpoint(
@@ -199,5 +209,49 @@ export class CellService {
       }
     }
     return cells.slice(0, limit);
+  }
+
+  async getPagedTokenCellsByCursor(
+    tokenId: string,
+    address: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<{
+    cells: ccc.Cell[];
+    cursor: string;
+  }> {
+    const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
+    if (!udtInfo) {
+      return {
+        cells: [],
+        cursor: "",
+      };
+    }
+
+    const lockScript = (await ccc.Address.fromString(address, this.client))
+      .script;
+    const typeScript: ccc.ScriptLike = {
+      codeHash: udtInfo.typeCodeHash,
+      hashType: udtInfo.typeCodeHash,
+      args: udtInfo.typeArgs,
+    };
+
+    const result = await this.client.findCellsPaged(
+      {
+        script: lockScript,
+        scriptType: "lock",
+        scriptSearchMode: "exact",
+        filter: {
+          script: typeScript,
+        },
+      },
+      "asc",
+      limit,
+      cursor,
+    );
+    return {
+      cells: result.cells,
+      cursor: result.lastCursor,
+    };
   }
 }

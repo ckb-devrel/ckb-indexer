@@ -1,7 +1,7 @@
 import {
   assertConfig,
   formatSortableInt,
-  parseAddress,
+  parseBtcAddress,
   parseScriptMode,
   ScriptMode,
   withTransaction,
@@ -28,6 +28,7 @@ export class SporeParserBuilder {
   constructor(
     configService: ConfigService,
     public readonly entityManager: EntityManager,
+    public readonly sporeRepo: SporeRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -49,6 +50,25 @@ export class SporeParserBuilder {
 
   build(blockHeight: ccc.NumLike): SporeParser {
     return new SporeParser(this, ccc.numFrom(blockHeight));
+  }
+
+  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
+  }
+
+  async getDobDecodedBySporeId(sporeId: ccc.Hex): Promise<string | undefined> {
+    return await this.sporeRepo.getDobBySporeId(sporeId);
   }
 }
 
@@ -89,19 +109,6 @@ class SporeParser {
     public readonly blockHeight: ccc.Num,
   ) {}
 
-  async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(
-      scriptLike,
-      this.context.client,
-      {
-        btcRequester: this.context.btcRequester,
-        rgbppBtcCodeHash: this.context.rgbppBtcCodeHash,
-        rgbppBtcHashType: this.context.rgbppBtcHashType,
-      },
-      this.context.logger,
-    );
-  }
-
   async analyzeFlow(
     tx: ccc.Transaction,
     mode: ScriptMode,
@@ -121,7 +128,7 @@ class SporeParser {
       if (expectedMode !== mode) {
         continue;
       }
-      const address = await this.scriptToAddress(cellOutput.lock);
+      const address = await this.context.scriptToAddress(cellOutput.lock);
       const sporeOrClusterId = cellOutput.type.args;
       flows[sporeOrClusterId] = {
         asset: {
@@ -146,7 +153,7 @@ class SporeParser {
       if (expectedMode !== mode) {
         continue;
       }
-      const address = await this.scriptToAddress(output.lock);
+      const address = await this.context.scriptToAddress(output.lock);
       const sporeOrClusterId = output.type.args;
       const burnSpore = flows[sporeOrClusterId];
       if (burnSpore) {
@@ -248,11 +255,14 @@ class SporeParser {
         );
       }
       try {
-        const dobDecoded = await this.decodeDob(
-          this.context.decoderUri,
-          data,
-          cluster.cell.outputData,
-        );
+        let dobDecoded = await this.context.getDobDecodedBySporeId(sporeId);
+        if (dobDecoded === undefined) {
+          dobDecoded = await this.decodeDob(
+            this.context.decoderUri,
+            data,
+            cluster.cell.outputData,
+          );
+        }
         Object.assign(decoded, { dobDecoded: JSON.stringify(dobDecoded) });
       } catch (error) {
         this.context.logger.warn(`Spore ${sporeId}: ${error}`);

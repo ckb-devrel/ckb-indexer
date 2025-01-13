@@ -1,15 +1,17 @@
 import {
   assert,
   asyncMap,
+  Chain,
   EventType,
   extractIsomorphicInfo,
+  IsomorphicBinding,
   RpcError,
   ScriptMode,
   TxAssetCellData,
   TxAssetCellDetail,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { AssetService } from "./asset.service";
 
@@ -23,22 +25,35 @@ export class AssetController {
     eventType: EventType,
   ): Promise<TxAssetCellDetail> {
     const scriptMode = await this.service.scriptMode(cell.cellOutput.lock);
-    const isomorphicInfo =
-      scriptMode === ScriptMode.Rgbpp
-        ? extractIsomorphicInfo(cell.cellOutput.lock)
-        : undefined;
+    const isomorphicInfo = extractIsomorphicInfo(cell.cellOutput.lock);
+    let isomorphicBinding: IsomorphicBinding | undefined = undefined;
+    if (isomorphicInfo) {
+      switch (scriptMode) {
+        case ScriptMode.RgbppBtc:
+          {
+            isomorphicBinding = {
+              chain: Chain.Btc,
+              txHash: ccc.hexFrom(isomorphicInfo.txHash),
+              index: Number(isomorphicInfo.index),
+            };
+          }
+          break;
+        case ScriptMode.RgbppDoge: {
+          isomorphicBinding = {
+            chain: Chain.Doge,
+            txHash: ccc.hexFrom(isomorphicInfo.txHash),
+            index: Number(isomorphicInfo.index),
+          };
+        }
+      }
+    }
     const cellAsset: TxAssetCellDetail = {
       index,
       capacity: cell.cellOutput.capacity,
       eventType,
       address: await this.service.scriptToAddress(cell.cellOutput.lock),
-      typeScriptType: scriptMode,
-      isomorphicBtcTx: isomorphicInfo?.txHash
-        ? ccc.hexFrom(isomorphicInfo.txHash)
-        : undefined,
-      isomorphicBtcTxVout: isomorphicInfo?.index
-        ? Number(isomorphicInfo.index)
-        : undefined,
+      typeCodeName: scriptMode,
+      rgbppBinding: isomorphicBinding,
     };
 
     const token = await this.service.getTokenFromCell(cell);
@@ -216,9 +231,9 @@ export class AssetController {
     description:
       "Query a list of assets in the cell from a transaction by TxHash",
   })
-  @Get("/queryTxAssetCellDataByTxHash")
+  @Get("/assetCells?txHash=:txHash")
   async queryTxAssetCellDataByTxHash(
-    @Param("txHash") txHash: string,
+    @Query("txHash") txHash: string,
   ): Promise<TxAssetCellData> {
     const { tx, blockHash, blockNumber } = assert(
       await this.service.getTransactionWithBlockByTxHash(txHash),
@@ -231,9 +246,9 @@ export class AssetController {
     type: TxAssetCellData,
     description: "Query a list of assets in the cell from a block by BlockHash",
   })
-  @Get("/queryTxAssetCellDataListByBlockHash")
+  @Get("/assetCells?blockHash=:blockHash")
   async queryTxAssetCellDataListByBlockHash(
-    @Param("blockHash") blockHash: string,
+    @Query("blockHash") blockHash: string,
   ): Promise<TxAssetCellData[]> {
     const block = assert(
       await this.service.getBlockByBlockHash(blockHash),

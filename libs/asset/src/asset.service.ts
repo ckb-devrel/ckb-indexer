@@ -1,6 +1,6 @@
 import {
   assertConfig,
-  parseAddress,
+  parseBtcAddress,
   parseScriptMode,
   ScriptMode,
 } from "@app/commons";
@@ -45,18 +45,28 @@ export class AssetService {
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, {
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    return await parseScriptMode(script, this.client, [
+      {
+        rgbppCodeHash: this.rgbppBtcCodeHash,
+        rgbppHashType: this.rgbppBtcHashType,
+        mode: ScriptMode.RgbppBtc,
+      },
+    ]);
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
-    return parseAddress(scriptLike, this.client, {
-      btcRequester: this.btcRequester,
-      rgbppBtcCodeHash: this.rgbppBtcCodeHash,
-      rgbppBtcHashType: this.rgbppBtcHashType,
-    });
+    if (
+      scriptLike.codeHash === this.rgbppBtcCodeHash &&
+      scriptLike.hashType === this.rgbppBtcHashType
+    ) {
+      return parseBtcAddress({
+        client: this.client,
+        rgbppScript: scriptLike,
+        requester: this.btcRequester,
+      });
+    }
+    const script = ccc.Script.from(scriptLike);
+    return ccc.Address.fromScript(script, this.client).toString();
   }
 
   async getTransactionWithBlockByTxHash(txHash: string): Promise<

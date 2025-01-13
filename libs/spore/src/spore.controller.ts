@@ -1,6 +1,6 @@
 import { assert, Chain, ClusterInfo, NFTInfo, RpcError } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { SporeService } from "./spore.service";
 
@@ -12,10 +12,10 @@ export class SporeController {
     type: ClusterInfo,
     description: "Get an on-chain cluster by the clusterId",
   })
-  @Get("/getSporeClusterById")
+  @Get("/clusters/:clusterId?withDesc=:withDesc")
   async getSporeClusterById(
     @Param("clusterId") clusterId: string,
-    @Param("withDesc") withDesc: boolean,
+    @Query("withDesc") withDesc: boolean,
   ): Promise<ClusterInfo> {
     const cluster = assert(
       await this.service.getCluster(clusterId),
@@ -48,10 +48,10 @@ export class SporeController {
     type: NFTInfo,
     description: "Get an on-chain spore by the sporeId",
   })
-  @Get("/getSporeById")
+  @Get("/spores/:sporeId?withClusterDesc=:withClusterDesc")
   async getSporeById(
     @Param("sporeId") sporeId: string,
-    @Param("withClusterDesc") withClusterDesc: boolean,
+    @Query("withClusterDesc") withClusterDesc: boolean,
   ): Promise<NFTInfo> {
     const spore = assert(
       await this.service.getSpore(sporeId),

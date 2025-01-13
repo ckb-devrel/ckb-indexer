@@ -1,13 +1,16 @@
 import {
   assert,
   asyncMap,
-  RgbppLockArgs,
+  Chain,
+  extractIsomorphicInfo,
+  IsomorphicBinding,
+  PagedTokenResult,
   RpcError,
   ScriptMode,
   TokenCell,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { CellService } from "./cell.service";
 
@@ -20,13 +23,29 @@ export class CellController {
     spender?: ccc.OutPoint,
   ): Promise<TokenCell> {
     const address = await this.service.scriptToAddress(cell.cellOutput.lock);
-    const btc = (() => {
-      try {
-        return RgbppLockArgs.decode(cell.cellOutput.lock.args);
-      } catch (err) {
-        return undefined;
+    const lockScriptMode = await this.service.scriptMode(cell.cellOutput.lock);
+    const isomorphicInfo = extractIsomorphicInfo(cell.cellOutput.lock);
+    let isomorphicBinding: IsomorphicBinding | undefined = undefined;
+    if (isomorphicInfo) {
+      switch (lockScriptMode) {
+        case ScriptMode.RgbppBtc: {
+          isomorphicBinding = {
+            chain: Chain.Btc,
+            txHash: ccc.hexFrom(isomorphicInfo.txHash),
+            index: Number(isomorphicInfo.index),
+          };
+          break;
+        }
+        case ScriptMode.RgbppDoge: {
+          isomorphicBinding = {
+            chain: Chain.Doge,
+            txHash: ccc.hexFrom(isomorphicInfo.txHash),
+            index: Number(isomorphicInfo.index),
+          };
+          break;
+        }
       }
-    })();
+    }
     const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     const typeScriptType = await this.service.scriptMode(typeScript);
     return {
@@ -34,7 +53,7 @@ export class CellController {
       vout: Number(cell.outPoint.index),
       lockScript: {
         ...cell.cellOutput.lock,
-        codeHashType: await this.service.scriptMode(cell.cellOutput.lock),
+        codeHashType: lockScriptMode,
       },
       typeScript: {
         ...typeScript,
@@ -50,8 +69,7 @@ export class CellController {
       spent: spender !== undefined,
       spenderTx: spender ? spender.txHash : undefined,
       inputIndex: spender ? Number(spender.index) : undefined,
-      isomorphicBtcTx: btc ? ccc.hexFrom(btc.txId) : undefined,
-      isomorphicBtcTxVout: btc ? btc.outIndex : undefined,
+      rgbppBinding: isomorphicBinding,
     };
   }
 
@@ -59,7 +77,7 @@ export class CellController {
     type: TokenCell,
     description: "Get an on-chain cell by CKB OutPoint",
   })
-  @Get("/getCellByOutpoint")
+  @Get("/cells/outpoint/:txHash/:index")
   async getCellByOutpoint(
     @Param("txHash") txHash: string,
     @Param("index") index: number,
@@ -76,7 +94,7 @@ export class CellController {
     type: TokenCell,
     description: "Get an on-chain cell by isomorphic UTXO",
   })
-  @Get("/getIsomorphicCellByUtxo")
+  @Get("/cells/isomorphic/:btcTxHash/:index")
   async getIsomorphicCellByUtxo(
     @Param("btcTxHash") btcTxHash: string,
     @Param("index") index: number,
@@ -93,19 +111,23 @@ export class CellController {
     type: [TokenCell],
     description: "Get paged tokens under a user CKB address",
   })
-  @Get("/getUserTokenCells")
+  @Get("/cells/paged/:tokenId/:address/:limit?cursor=:cursor?")
   async getUserTokenCells(
     @Param("tokenId") tokenId: string,
     @Param("address") address: string,
-    @Param("offset") offset: number,
     @Param("limit") limit: number,
-  ): Promise<TokenCell[]> {
-    const pagedCells = await this.service.getPagedTokenCells(
-      tokenId,
-      address,
-      offset,
-      limit,
-    );
-    return await asyncMap(pagedCells, this.cellToTokenCell);
+    @Query("cursor") cursor?: string,
+  ): Promise<PagedTokenResult> {
+    const { cells, cursor: lastCursor } =
+      await this.service.getPagedTokenCellsByCursor(
+        tokenId,
+        address,
+        limit,
+        cursor,
+      );
+    return {
+      cells: await asyncMap(cells, this.cellToTokenCell),
+      cursor: lastCursor,
+    };
   }
 }

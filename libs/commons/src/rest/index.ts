@@ -4,18 +4,20 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 export enum Chain {
   Ckb = "ckb",
   Btc = "btc",
+  Doge = "doge",
 }
 
 export enum ScriptMode {
-  Rgbpp,
-  SingleUseLock,
-  Xudt,
-  Spore,
-  Cluster,
-  Acp,
-  Secp256k1,
-  JoyId,
-  Unknown,
+  RgbppBtc = "rgbppBtc",
+  RgbppDoge = "rgbppDoge",
+  SingleUseLock = "singleUseLock",
+  Xudt = "xudt",
+  Spore = "spore",
+  Cluster = "cluster",
+  Acp = "acp",
+  Secp256k1 = "secp256k1",
+  JoyId = "joyId",
+  Unknown = "unknown",
 }
 
 enum ApiHashType {
@@ -53,8 +55,6 @@ export class TokenInfo {
   mintable: boolean;
   @ApiProperty({ type: Number })
   holderCount: ccc.Num;
-  @ApiProperty()
-  rgbppTag: boolean;
   @ApiProperty({ enum: Chain })
   issueChain: Chain;
   @ApiProperty({ type: String })
@@ -175,11 +175,11 @@ export class NFTInfo {
 }
 
 export enum EventType {
-  Mint,
-  Transfer,
-  MintAndTransfer,
-  Burn,
-  BurnAndTransfer,
+  Mint = "mint",
+  Transfer = "transfer",
+  MintAndTransfer = "mint&transfer",
+  Burn = "burn",
+  BurnAndTransfer = "burn&transfer",
 }
 
 export class NFTData {
@@ -210,6 +210,15 @@ export class TokenData {
   decimal?: number;
 }
 
+export class IsomorphicBinding {
+  @ApiProperty({ enum: Chain })
+  chain: Chain;
+  @ApiProperty({ type: String })
+  txHash: ccc.Hex;
+  @ApiProperty({ type: Number })
+  index: number;
+}
+
 export class TxAssetCellDetail {
   @ApiProperty()
   index: number;
@@ -220,15 +229,13 @@ export class TxAssetCellDetail {
   @ApiProperty()
   address: string;
   @ApiProperty({ enum: ScriptMode })
-  typeScriptType: ScriptMode;
+  typeCodeName: ScriptMode;
   @ApiPropertyOptional({ type: TokenData })
   tokenData?: TokenData;
   @ApiPropertyOptional({ type: NFTData })
   nftData?: NFTData;
-  @ApiPropertyOptional({ type: String })
-  isomorphicBtcTx?: ccc.Hex;
-  @ApiPropertyOptional()
-  isomorphicBtcTxVout?: number;
+  @ApiPropertyOptional({ type: IsomorphicBinding })
+  rgbppBinding?: IsomorphicBinding;
 }
 
 export class TxAssetCellData {
@@ -267,8 +274,13 @@ export class TokenCell {
   spenderTx?: ccc.Hex;
   @ApiPropertyOptional()
   inputIndex?: number;
-  @ApiPropertyOptional({ type: String })
-  isomorphicBtcTx?: ccc.Hex;
-  @ApiPropertyOptional()
-  isomorphicBtcTxVout?: number;
+  @ApiPropertyOptional({ type: IsomorphicBinding })
+  rgbppBinding?: IsomorphicBinding;
+}
+
+export class PagedTokenResult {
+  @ApiProperty({ type: TokenCell, isArray: true })
+  cells: TokenCell[];
+  @ApiProperty()
+  cursor: string;
 }
