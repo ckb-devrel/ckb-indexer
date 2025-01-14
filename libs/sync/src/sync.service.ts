@@ -267,17 +267,29 @@ export class SyncService {
               const rolledBackHeight = formatSortableInt(block.height);
               await blockRepo.delete({ hash: block.hash });
 
-              const updateHash = await syncStatusRepo.update(pendingHash, {
-                value: block.parentHash,
-              });
-              const updateNumber = await syncStatusRepo.update(pendingStatus, {
-                value: formatSortableInt(
-                  parseSortableInt(block.height) - ccc.numFrom(1),
-                ),
-              });
+              const updateHash = await syncStatusRepo.update(
+                {
+                  key: pendingHash.key,
+                  value: pendingHash.value,
+                },
+                {
+                  value: block.parentHash,
+                },
+              );
+              const updateNumber = await syncStatusRepo.update(
+                {
+                  key: pendingStatus.key,
+                  value: pendingStatus.value,
+                },
+                {
+                  value: formatSortableInt(
+                    parseSortableInt(block.height) - ccc.numFrom(1),
+                  ),
+                },
+              );
               if (
-                (updateHash.affected ?? 0) + (updateNumber.affected ?? 0) ===
-                0
+                (updateHash.affected ?? 0) === 0 ||
+                (updateNumber.affected ?? 0) === 0
               ) {
                 throw new Error(
                   `Failed to rollback pending block hash from ${pendingStatus.value}(${pendingHash.value}) to ${block.height}(${block.parentHash})`,
