@@ -204,10 +204,10 @@ export async function parseDogeAddress() {
 export async function parseBtcAddress(params: {
   client: ccc.Client;
   rgbppScript: ccc.ScriptLike;
-  requester: AxiosInstance;
+  requesters: AxiosInstance[];
   logger?: Logger;
 }): Promise<string> {
-  const { client, rgbppScript, requester, logger } = params;
+  const { client, rgbppScript, requesters, logger } = params;
   const script = ccc.Script.from(rgbppScript);
   const ckbAddress = ccc.Address.fromScript(script, client).toString();
 
@@ -221,27 +221,39 @@ export async function parseBtcAddress(params: {
   if (!decoded) {
     return ckbAddress;
   }
-
   const { outIndex, txId } = decoded;
-  const { data } = await requester.post("/", {
-    method: "getrawtransaction",
-    params: [txId.slice(2), true],
-  });
 
-  if (
-    data?.error &&
-    !JSON.stringify(data?.error).includes(
-      "No such mempool or blockchain transaction.",
-    )
-  ) {
-    throw data.error;
+  let error: any | undefined = undefined;
+  for (const requester of requesters) {
+    const { data } = await requester.post("/", {
+      method: "getrawtransaction",
+      params: [txId.slice(2), true],
+    });
+
+    if (
+      data?.error &&
+      !JSON.stringify(data?.error).includes(
+        "No such mempool or blockchain transaction.",
+      )
+    ) {
+      error = data.error;
+      continue;
+    }
+
+    if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
+      logger?.warn(
+        `Failed to get btc rgbpp utxo ${txId}:${outIndex} from ${requester.getUri()}`,
+      );
+      continue;
+    }
+    return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
   }
 
-  if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
-    logger?.warn(`Failed to get btc rgbpp utxo ${txId}:${outIndex}`);
-    return ckbAddress;
+  if (error) {
+    throw error;
   }
-  return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
+
+  return ckbAddress;
 }
 
 export function extractIsomorphicInfo(

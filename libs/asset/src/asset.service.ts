@@ -21,7 +21,7 @@ export class AssetService {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
   }[];
-  private readonly btcRequester: AxiosInstance;
+  private readonly btcRequesters: AxiosInstance[];
 
   constructor(
     private readonly configService: ConfigService,
@@ -42,10 +42,8 @@ export class AssetService {
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
 
-    const btcRpcUri = assertConfig<string>(configService, "sync.btcRpcUri");
-    this.btcRequester = axios.create({
-      baseURL: btcRpcUri,
-    });
+    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
+    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
 
     const udtTypes =
       configService.get<
@@ -76,7 +74,7 @@ export class AssetService {
       return parseBtcAddress({
         client: this.client,
         rgbppScript: scriptLike,
-        requester: this.btcRequester,
+        requesters: this.btcRequesters,
       });
     }
     const script = ccc.Script.from(scriptLike);

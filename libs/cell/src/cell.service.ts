@@ -9,19 +9,18 @@ import { ccc } from "@ckb-ccc/shell";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
-import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import { UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class CellService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
-  private readonly btcRequester: AxiosInstance;
+  private readonly btcRequesters: AxiosInstance[];
 
   constructor(
     private readonly configService: ConfigService,
     private readonly udtInfoRepo: UdtInfoRepo,
-    private readonly udtBalanceRepo: UdtBalanceRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -36,10 +35,8 @@ export class CellService {
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
 
-    const btcRpcUri = assertConfig<string>(configService, "sync.btcRpcUri");
-    this.btcRequester = axios.create({
-      baseURL: btcRpcUri,
-    });
+    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
+    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
@@ -60,7 +57,7 @@ export class CellService {
       return parseBtcAddress({
         client: this.client,
         rgbppScript: scriptLike,
-        requester: this.btcRequester,
+        requesters: this.btcRequesters,
       });
     }
     const script = ccc.Script.from(scriptLike);

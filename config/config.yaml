@@ -20,16 +20,25 @@ sync:
   rgbppBtcCodeHash: "0xd07598deec7ce7b5665310386b4abd06a6d48843e953c5cc2112ad0d5a220364"
   rgbppBtcHashType: "type"
 
-  rgbppBtcTimelockCodeHash: ""
-  rgbppBtcTimelockHashType: "type"
-
   udtTypes:
     # sUDT
     - codeHash: "0x48dbf59b4c7ee1547238021b4869bceedf4eea6b43772e5d66ef8865b6ae7212"
       hashType: "data"
+    # sUDT
+    - codeHash: "0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4"
+      hashType: "type"
     # xUDT
     - codeHash: "0x50bd8d6680b8b9cf98b73f3c08faf8b2a21914311954118ad6609be6e78a1b95"
       hashType: "data1"
+    # xUDT Compatible 1
+    - codeHash: "0x98701eaf939113606a8a70013fd2e8f27b8f1e234acdc329f3d71f9e9d3d3233"
+      hashType: "type"
+    # xUDT Compatible 2
+    - codeHash: "0x1142755a044bf2ee358cba9f2da187ce928c91cd4dc8692ded0337efa677d21a"
+      hashType: "type"
+    # xUDT Compatible 3
+    - codeHash: "0xcc9dc33ef234e14bc788c43a4848556a5fb16401a04662fc55db9bb201987037"
+      hashType: "type"
     # xUDT(final_rls)
     - codeHash: "0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb"
       hashType: "type"
@@ -38,6 +47,8 @@ sync:
   maxConcurrent: 1024
   ckbRpcTimeout: 60000
   ckbRpcUri: wss://testnet.ckb.dev/ws
-  btcRpcUri: https://rpc.ankr.com/btc_signet
   decoderServerUri: http://decoder:8090
   ssriServerUri: http://ssri:9090
+
+  btcRpcUris:
+    - https://rpc.ankr.com/btc_signet
