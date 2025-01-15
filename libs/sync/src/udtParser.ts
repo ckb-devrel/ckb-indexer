@@ -49,7 +49,7 @@ async function trySsriMethod<T>(
 @Injectable()
 export class UdtParser {
   public readonly logger = new Logger(UdtParser.name);
-  public readonly btcRequester: AxiosInstance;
+  public readonly btcRequesters: AxiosInstance[];
   public readonly client: ccc.Client;
   public readonly executor: ccc.ssri.Executor;
 
@@ -85,9 +85,6 @@ export class UdtParser {
           maxConcurrent,
         });
 
-    this.btcRequester = axios.create({
-      baseURL: assertConfig(configService, "sync.btcRpcUri"),
-    });
     this.rgbppBtcCodeHash = ccc.hexFrom(
       assertConfig(configService, "sync.rgbppBtcCodeHash"),
     );
@@ -100,6 +97,9 @@ export class UdtParser {
         { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
       >("sync.udtTypes") ?? [];
     this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
+
+    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
+    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   async udtInfoHandleTx(tx: ccc.Transaction) {
@@ -516,7 +516,7 @@ export class UdtParser {
       return parseBtcAddress({
         client: this.client,
         rgbppScript: scriptLike,
-        requester: this.btcRequester,
+        requesters: this.btcRequesters,
       });
     }
     const script = ccc.Script.from(scriptLike);

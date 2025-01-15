@@ -22,7 +22,7 @@ export class SporeParserBuilder {
   public readonly client: ccc.Client;
   public readonly decoderUri: string;
 
-  public readonly btcRequester: AxiosInstance;
+  public readonly btcRequesters: AxiosInstance[];
   public readonly rgbppBtcCodeHash: ccc.Hex;
   public readonly rgbppBtcHashType: ccc.HashType;
 
@@ -38,15 +38,15 @@ export class SporeParserBuilder {
       : new ccc.ClientPublicTestnet({ url: ckbRpcUri });
 
     this.decoderUri = assertConfig(configService, "sync.decoderServerUri");
-    this.btcRequester = axios.create({
-      baseURL: assertConfig(configService, "sync.btcRpcUri"),
-    });
     this.rgbppBtcCodeHash = ccc.hexFrom(
       assertConfig(configService, "sync.rgbppBtcCodeHash"),
     );
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
+
+    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
+    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   build(blockHeight: ccc.NumLike): SporeParser {
@@ -61,7 +61,7 @@ export class SporeParserBuilder {
       return parseBtcAddress({
         client: this.client,
         rgbppScript: scriptLike,
-        requester: this.btcRequester,
+        requesters: this.btcRequesters,
       });
     }
     const script = ccc.Script.from(scriptLike);

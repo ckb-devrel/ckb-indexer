@@ -12,7 +12,7 @@ export class SporeService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
-  private readonly btcRequester: AxiosInstance;
+  private readonly btcRequesters: AxiosInstance[];
 
   constructor(
     private readonly configService: ConfigService,
@@ -32,10 +32,8 @@ export class SporeService {
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
 
-    const btcRpcUri = assertConfig<string>(configService, "sync.btcRpcUri");
-    this.btcRequester = axios.create({
-      baseURL: btcRpcUri,
-    });
+    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
+    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
@@ -46,7 +44,7 @@ export class SporeService {
       return parseBtcAddress({
         client: this.client,
         rgbppScript: scriptLike,
-        requester: this.btcRequester,
+        requesters: this.btcRequesters,
       });
     }
     const script = ccc.Script.from(scriptLike);
