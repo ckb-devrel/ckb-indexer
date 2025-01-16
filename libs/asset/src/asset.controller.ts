@@ -133,16 +133,19 @@ export class AssetController {
         index,
         EventType.Burn,
       );
+      if (cellAsset.typeCodeName === ScriptMode.Unknown) {
+        continue;
+      }
       if (cellAsset.tokenData) {
         const tokenId = cellAsset.tokenData.tokenId;
         if (tokenGroups[tokenId]) {
           tokenGroups[tokenId].input.totalBalance += cellAsset.tokenData.amount;
-          tokenGroups[tokenId].input.indices.push(index);
+          tokenGroups[tokenId].input.indices.push(txAssetData.inputs.length);
         } else {
           tokenGroups[tokenId] = {
             input: {
               totalBalance: cellAsset.tokenData.amount,
-              indices: [index],
+              indices: [txAssetData.inputs.length],
             },
             output: {
               totalBalance: ccc.numFrom(0),
@@ -164,6 +167,9 @@ export class AssetController {
         index,
         EventType.Mint,
       );
+      if (cellAsset.typeCodeName === ScriptMode.Unknown) {
+        continue;
+      }
       if (cellAsset.nftData) {
         const nftIndex = txAssetData.inputs.findIndex(
           (input) =>
@@ -180,7 +186,7 @@ export class AssetController {
         if (tokenGroups[tokenId]) {
           tokenGroups[tokenId].output.totalBalance +=
             cellAsset.tokenData.amount;
-          tokenGroups[tokenId].output.indices.push(index);
+          tokenGroups[tokenId].output.indices.push(txAssetData.outputs.length);
         } else {
           tokenGroups[tokenId] = {
             input: {
@@ -189,7 +195,7 @@ export class AssetController {
             },
             output: {
               totalBalance: cellAsset.tokenData.amount,
-              indices: [index],
+              indices: [txAssetData.outputs.length],
             },
           };
         }
