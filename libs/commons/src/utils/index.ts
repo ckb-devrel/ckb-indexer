@@ -17,6 +17,7 @@ export function deduplicate<T>(arr: T[]) {
 export function autoRun(
   logger: Logger,
   autoIntervalMsRaw: string | number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handler: () => any,
 ) {
   const autoIntervalMs = Number(autoIntervalMsRaw);
@@ -159,6 +160,7 @@ export async function parseScriptMode(
   const paris = {
     [ccc.KnownScript.SingleUseLock]: ScriptMode.SingleUseLock,
     [ccc.KnownScript.XUdt]: ScriptMode.Udt,
+    [ccc.KnownScript.OmniLock]: ScriptMode.OmniLock,
     [ccc.KnownScript.AnyoneCanPay]: ScriptMode.Acp,
     [ccc.KnownScript.Secp256k1Blake160]: ScriptMode.Secp256k1,
     [ccc.KnownScript.JoyId]: ScriptMode.JoyId,
@@ -223,6 +225,7 @@ export async function parseBtcAddress(params: {
   }
   const { outIndex, txId } = decoded;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let error: any | undefined = undefined;
   for (const requester of requesters) {
     const { data } = await requester.post("/", {

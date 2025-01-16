@@ -127,29 +127,32 @@ export class CellController {
   }
 
   @ApiOkResponse({
-    type: [TokenCell],
+    type: [PagedTokenResult],
     description: "Get paged tokens under a user CKB address",
   })
   @ApiQuery({
     name: "cursor",
     required: false,
+    description: "The cursor of the last cell returned (optional)",
   })
   @ApiQuery({
     name: "limit",
     required: false,
+    description:
+      "The maximum number of tokens to return, or 10 as default value (optional)",
   })
   @Get("/cells/:tokenId/:address")
   async getUserTokenCells(
     @Param("tokenId") tokenId: string,
     @Param("address") address: string,
-    @Query("limit") limit?: number,
+    @Query("limit") limit: number,
     @Query("cursor") cursor?: string,
   ): Promise<PagedTokenResult> {
     const { cells, cursor: lastCursor } =
       await this.service.getPagedTokenCellsByCursor(
         tokenId,
         address,
-        limit ?? 10,
+        isNaN(limit) ? 10 : limit,
         cursor,
       );
     return {

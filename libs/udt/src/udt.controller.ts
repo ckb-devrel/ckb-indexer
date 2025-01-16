@@ -141,13 +141,13 @@ export class UdtController {
   @Get("/tokens/:tokenId/holders")
   async getTokenHolders(
     @Param("tokenId") tokenId: string,
-    @Query("offset") offset?: number,
-    @Query("limit") limit?: number,
+    @Query("offset") offset: number,
+    @Query("limit") limit: number,
   ): Promise<TokenBalance[]> {
     const udtBalances = await this.service.getTokenAllBalances(
       tokenId,
-      offset ?? 0,
-      limit ?? 10,
+      isNaN(offset) ? 0 : offset,
+      isNaN(limit) ? 10 : limit,
     );
     return await asyncMap(
       udtBalances,

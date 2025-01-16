@@ -11,6 +11,7 @@ export enum ScriptMode {
   RgbppBtc = "rgbppBtc",
   RgbppDoge = "rgbppDoge",
   SingleUseLock = "singleUseLock",
+  OmniLock = "omniLock",
   Udt = "udt",
   Spore = "spore",
   Cluster = "cluster",
