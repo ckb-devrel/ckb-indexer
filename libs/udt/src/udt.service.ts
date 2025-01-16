@@ -104,8 +104,16 @@ export class UdtService {
     return await this.udtBalanceRepo.getTokenItemsByAddress(address, tokenId);
   }
 
-  async getTokenAllBalances(tokenId: ccc.HexLike): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenItemsByTokenId(tokenId);
+  async getTokenAllBalances(
+    tokenId: ccc.HexLike,
+    offset: number,
+    limit: number,
+  ): Promise<UdtBalance[]> {
+    return await this.udtBalanceRepo.getTokenItemsByTokenId(
+      tokenId,
+      offset,
+      limit,
+    );
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {

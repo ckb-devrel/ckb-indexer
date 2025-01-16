@@ -40,7 +40,11 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     }
   }
 
-  async getTokenItemsByTokenId(tokenHash: ccc.HexLike): Promise<UdtBalance[]> {
+  async getTokenItemsByTokenId(
+    tokenHash: ccc.HexLike,
+    offset: number,
+    limit: number,
+  ): Promise<UdtBalance[]> {
     const rawSql = `
       SELECT ub.*
       FROM udt_balance AS ub
@@ -49,9 +53,14 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
         FROM udt_balance AS ub_inner
         WHERE ub_inner.tokenHash = ? AND ub_inner.balance > 0
         GROUP BY ub_inner.addressHash
-      );
+      )
+      LIMIT ? OFFSET ?;
     `;
-    return await this.manager.query(rawSql, [ccc.hexFrom(tokenHash)]);
+    return await this.manager.query(rawSql, [
+      ccc.hexFrom(tokenHash),
+      limit,
+      offset,
+    ]);
   }
 
   async getItemCountByTokenHash(tokenHash: ccc.HexLike): Promise<number> {

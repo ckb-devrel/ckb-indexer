@@ -256,7 +256,7 @@ export class CellService {
       .script;
     const typeScript: ccc.ScriptLike = {
       codeHash: udtInfo.typeCodeHash,
-      hashType: udtInfo.typeCodeHash,
+      hashType: udtInfo.typeHashType,
       args: udtInfo.typeArgs,
     };
 
