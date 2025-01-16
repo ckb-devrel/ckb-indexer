@@ -15,7 +15,7 @@ import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOkResponse, ApiQuery } from "@nestjs/swagger";
 import { UdtService } from "./udt.service";
 
-(BigInt.prototype as any).toJSON = function () {
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
   return this.toString();
 };
 
@@ -127,11 +127,28 @@ export class UdtController {
     type: [TokenBalance],
     description: "Filter all token holders by tokenId",
   })
+  @ApiQuery({
+    name: "offset",
+    required: false,
+    description: "The offset of the first holder to return (optional)",
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description:
+      "The maximum number of holders to return, or 10 as default value (optional)",
+  })
   @Get("/tokens/:tokenId/holders")
   async getTokenHolders(
     @Param("tokenId") tokenId: string,
+    @Query("offset") offset?: number,
+    @Query("limit") limit?: number,
   ): Promise<TokenBalance[]> {
-    const udtBalances = await this.service.getTokenAllBalances(tokenId);
+    const udtBalances = await this.service.getTokenAllBalances(
+      tokenId,
+      offset ?? 0,
+      limit ?? 10,
+    );
     return await asyncMap(
       udtBalances,
       this.udtBalanceToTokenBalance.bind(this),

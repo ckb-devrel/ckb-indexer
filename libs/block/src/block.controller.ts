@@ -10,7 +10,7 @@ import { Controller, Get, Param } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 import { BlockService } from "./block.service";
 
-(BigInt.prototype as any).toJSON = function () {
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
   return this.toString();
 };
 
