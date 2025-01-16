@@ -217,7 +217,7 @@ export class IsomorphicBinding {
   @ApiProperty({ type: String })
   txHash: ccc.Hex;
   @ApiProperty({ type: Number })
-  index: number;
+  vout: number;
 }
 
 export class TxAssetCellDetail {

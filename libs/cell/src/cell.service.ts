@@ -1,8 +1,10 @@
 import {
+  assert,
   assertConfig,
   parseBtcAddress,
   parseScriptMode,
   RgbppLockArgs,
+  RpcError,
   ScriptMode,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
@@ -181,59 +183,59 @@ export class CellService {
     return spentCell ? { cell: spentCell, spender } : undefined;
   }
 
-  async getPagedTokenCells(
-    tokenId: string,
-    address: string,
-    offset: number,
-    limit: number,
-  ): Promise<ccc.Cell[]> {
-    const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
-    if (!udtInfo) {
-      return [];
-    }
+  // async getPagedTokenCells(
+  //   tokenId: string,
+  //   address: string,
+  //   offset: number,
+  //   limit: number,
+  // ): Promise<ccc.Cell[]> {
+  //   const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
+  //   if (!udtInfo) {
+  //     return [];
+  //   }
 
-    const lockScript = (await ccc.Address.fromString(address, this.client))
-      .script;
-    const typeScript: ccc.ScriptLike = {
-      codeHash: udtInfo.typeCodeHash,
-      hashType: udtInfo.typeCodeHash,
-      args: udtInfo.typeArgs,
-    };
+  //   const lockScript = (await ccc.Address.fromString(address, this.client))
+  //     .script;
+  //   const typeScript: ccc.ScriptLike = {
+  //     codeHash: udtInfo.typeCodeHash,
+  //     hashType: udtInfo.typeCodeHash,
+  //     args: udtInfo.typeArgs,
+  //   };
 
-    const searchLimit = 30;
-    const cells: ccc.Cell[] = [];
-    let lastCursor: string | undefined;
-    while (offset > 0) {
-      const result = await this.client.findCellsPaged(
-        {
-          script: lockScript,
-          scriptType: "lock",
-          scriptSearchMode: "exact",
-          filter: {
-            script: typeScript,
-          },
-        },
-        "asc",
-        searchLimit,
-        lastCursor,
-      );
-      lastCursor = result.lastCursor;
-      if (result.cells.length <= offset) {
-        offset -= result.cells.length;
-        continue;
-      } else {
-        cells.push(...result.cells.slice(offset));
-        offset = 0;
-        if (cells.length >= limit) {
-          break;
-        }
-      }
-      if (result.cells.length < searchLimit) {
-        break;
-      }
-    }
-    return cells.slice(0, limit);
-  }
+  //   const searchLimit = 30;
+  //   const cells: ccc.Cell[] = [];
+  //   let lastCursor: string | undefined;
+  //   while (offset > 0) {
+  //     const result = await this.client.findCellsPaged(
+  //       {
+  //         script: lockScript,
+  //         scriptType: "lock",
+  //         scriptSearchMode: "exact",
+  //         filter: {
+  //           script: typeScript,
+  //         },
+  //       },
+  //       "asc",
+  //       searchLimit,
+  //       lastCursor,
+  //     );
+  //     lastCursor = result.lastCursor;
+  //     if (result.cells.length <= offset) {
+  //       offset -= result.cells.length;
+  //       continue;
+  //     } else {
+  //       cells.push(...result.cells.slice(offset));
+  //       offset = 0;
+  //       if (cells.length >= limit) {
+  //         break;
+  //       }
+  //     }
+  //     if (result.cells.length < searchLimit) {
+  //       break;
+  //     }
+  //   }
+  //   return cells.slice(0, limit);
+  // }
 
   async getPagedTokenCellsByCursor(
     tokenId: string,
@@ -244,14 +246,10 @@ export class CellService {
     cells: ccc.Cell[];
     cursor: string;
   }> {
-    const udtInfo = await this.udtInfoRepo.getTokenInfoByTokenId(tokenId);
-    if (!udtInfo) {
-      return {
-        cells: [],
-        cursor: "",
-      };
-    }
-
+    const udtInfo = assert(
+      await this.udtInfoRepo.getTokenInfoByTokenId(tokenId),
+      RpcError.TokenNotFound,
+    );
     const lockScript = (await ccc.Address.fromString(address, this.client))
       .script;
     const typeScript: ccc.ScriptLike = {

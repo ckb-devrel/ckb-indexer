@@ -37,7 +37,7 @@ export class CellController {
           isomorphicBinding = {
             chain: Chain.Btc,
             txHash: ccc.hexFrom(isomorphicInfo.txHash),
-            index: Number(isomorphicInfo.index),
+            vout: Number(isomorphicInfo.index),
           };
           break;
         }
@@ -45,7 +45,7 @@ export class CellController {
           isomorphicBinding = {
             chain: Chain.Doge,
             txHash: ccc.hexFrom(isomorphicInfo.txHash),
-            index: Number(isomorphicInfo.index),
+            vout: Number(isomorphicInfo.index),
           };
           break;
         }
