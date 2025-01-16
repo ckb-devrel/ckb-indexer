@@ -40,7 +40,7 @@ export class AssetController {
             isomorphicBinding = {
               chain: Chain.Btc,
               txHash: ccc.hexFrom(isomorphicInfo.txHash),
-              index: Number(isomorphicInfo.index),
+              vout: Number(isomorphicInfo.index),
             };
           }
           break;
@@ -48,7 +48,7 @@ export class AssetController {
           isomorphicBinding = {
             chain: Chain.Doge,
             txHash: ccc.hexFrom(isomorphicInfo.txHash),
-            index: Number(isomorphicInfo.index),
+            vout: Number(isomorphicInfo.index),
           };
         }
       }
@@ -287,7 +287,12 @@ export class AssetController {
           block.header.hash,
           block.header.number,
         );
-        txAssetCellDataList.push(txAssetCellData);
+        if (
+          txAssetCellData.inputs.length > 0 &&
+          txAssetCellData.outputs.length > 0
+        ) {
+          txAssetCellDataList.push(txAssetCellData);
+        }
       });
       return txAssetCellDataList;
     } catch (e) {
