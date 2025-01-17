@@ -8,6 +8,7 @@ import {
   RpcError,
   ScriptMode,
   TokenBalance,
+  TokenHolders,
   TokenInfo,
 } from "@app/commons";
 import { UdtBalance } from "@app/schemas";
@@ -134,7 +135,7 @@ export class UdtController {
   }
 
   @ApiOkResponse({
-    type: [TokenBalance],
+    type: TokenHolders,
     description: "Filter all token holders by tokenId",
   })
   @ApiQuery({
@@ -153,18 +154,22 @@ export class UdtController {
     @Param("tokenId") tokenId: string,
     @Query("offset") offset: number,
     @Query("limit") limit: number,
-  ): Promise<NormalizedReturn<TokenBalance[]>> {
+  ): Promise<NormalizedReturn<TokenHolders>> {
     const udtBalances = await this.service.getTokenAllBalances(
       tokenId,
       isNaN(offset) ? 0 : offset,
       isNaN(limit) ? 10 : limit,
     );
+    const udtBalanceTotal = await this.service.getTokenHoldersCount(tokenId);
     return {
       code: 0,
-      data: await asyncMap(
-        udtBalances,
-        this.udtBalanceToTokenBalance.bind(this),
-      ),
+      data: {
+        total: udtBalanceTotal,
+        balances: await asyncMap(
+          udtBalances,
+          this.udtBalanceToTokenBalance.bind(this),
+        ),
+      },
     };
   }
 }
