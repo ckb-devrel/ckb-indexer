@@ -132,9 +132,9 @@ export class ClusterInfo {
   @ApiProperty()
   creator: string;
   @ApiProperty()
-  itemsCount: number;
+  itemCount: number;
   @ApiProperty()
-  holdersCount: number;
+  holderCount: number;
   @ApiProperty({ enum: Chain })
   issueChain: Chain;
   @ApiProperty({ type: String })
@@ -290,4 +290,11 @@ export class PagedTokenResult {
   cells: TokenCell[];
   @ApiProperty()
   cursor: string;
+}
+
+export class TokenHolders {
+  @ApiProperty()
+  total: number;
+  @ApiProperty({ type: TokenBalance, isArray: true })
+  balances: TokenBalance[];
 }
