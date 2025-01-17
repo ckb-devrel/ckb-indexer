@@ -1,6 +1,7 @@
 import {
   ApiError,
   assert,
+  NormalizedReturn,
   parseSortableInt,
   RpcError,
   TrackerInfo,
@@ -23,7 +24,7 @@ export class SyncController {
     description: "Get current tracker running status quo",
   })
   @Get("/trackerInfo")
-  async getTrackerInfo(): Promise<TrackerInfo | ApiError> {
+  async getTrackerInfo(): Promise<NormalizedReturn<TrackerInfo>> {
     try {
       const dbTip = assert(
         await this.service.getBlockHeader({
@@ -38,14 +39,20 @@ export class SyncController {
         RpcError.BlockNotFound,
       );
       return {
-        trackerBlockHeight: parseSortableInt(dbTip.height),
-        trackerBestBlockHash: ccc.hexFrom(dbTip.hash),
-        nodeBlockHeight: parseSortableInt(nodeTip.height),
-        nodeBestBlockHash: ccc.hexFrom(nodeTip.hash),
+        code: 0,
+        data: {
+          trackerBlockHeight: parseSortableInt(dbTip.height),
+          trackerBestBlockHash: ccc.hexFrom(dbTip.hash),
+          nodeBlockHeight: parseSortableInt(nodeTip.height),
+          nodeBestBlockHash: ccc.hexFrom(nodeTip.hash),
+        },
       };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }

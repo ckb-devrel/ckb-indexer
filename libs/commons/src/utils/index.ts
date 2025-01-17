@@ -81,7 +81,6 @@ export const RpcErrorMessage: Record<RpcError, string> = {
 };
 
 export class ApiError {
-  name = "Api Error";
   message: string;
 
   constructor(message: string) {

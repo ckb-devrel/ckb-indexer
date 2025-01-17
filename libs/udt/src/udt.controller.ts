@@ -3,6 +3,7 @@ import {
   assert,
   asyncMap,
   Chain,
+  NormalizedReturn,
   parseSortableInt,
   RpcError,
   ScriptMode,
@@ -47,7 +48,7 @@ export class UdtController {
   @Get("/tokens/:tokenId")
   async getTokenInfo(
     @Param("tokenId") tokenId: string,
-  ): Promise<TokenInfo | ApiError> {
+  ): Promise<NormalizedReturn<TokenInfo>> {
     try {
       const { udtInfo, tx, block } = assert(
         await this.service.getTokenInfo(tokenId, true),
@@ -80,22 +81,28 @@ export class UdtController {
           mode !== ScriptMode.SingleUseLock,
       );
       return {
-        tokenId: ccc.hexFrom(udtInfo.hash),
-        name: udtInfo.name ?? undefined,
-        symbol: udtInfo.symbol ?? undefined,
-        decimal: udtInfo.decimals ?? undefined,
-        owner: udtInfo.owner ?? undefined,
-        totalAmount: ccc.numFrom(udtInfo.totalSupply),
-        mintable,
-        holderCount: ccc.numFrom(holderCount),
-        issueChain,
-        issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),
-        issueTxHeight: parseSortableInt(issueBlock.height),
-        issueTime: issueBlock.timestamp,
+        code: 0,
+        data: {
+          tokenId: ccc.hexFrom(udtInfo.hash),
+          name: udtInfo.name ?? undefined,
+          symbol: udtInfo.symbol ?? undefined,
+          decimal: udtInfo.decimals ?? undefined,
+          owner: udtInfo.owner ?? undefined,
+          totalAmount: ccc.numFrom(udtInfo.totalSupply),
+          mintable,
+          holderCount: ccc.numFrom(holderCount),
+          issueChain,
+          issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),
+          issueTxHeight: parseSortableInt(issueBlock.height),
+          issueTime: issueBlock.timestamp,
+        },
       };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
@@ -115,12 +122,15 @@ export class UdtController {
   async getTokenBalances(
     @Param("address") address: string,
     @Query("tokenId") tokenId?: string,
-  ): Promise<TokenBalance[]> {
+  ): Promise<NormalizedReturn<TokenBalance[]>> {
     const udtBalances = await this.service.getTokenBalance(address, tokenId);
-    return await asyncMap(
-      udtBalances,
-      this.udtBalanceToTokenBalance.bind(this),
-    );
+    return {
+      code: 0,
+      data: await asyncMap(
+        udtBalances,
+        this.udtBalanceToTokenBalance.bind(this),
+      ),
+    };
   }
 
   @ApiOkResponse({
@@ -143,15 +153,18 @@ export class UdtController {
     @Param("tokenId") tokenId: string,
     @Query("offset") offset: number,
     @Query("limit") limit: number,
-  ): Promise<TokenBalance[]> {
+  ): Promise<NormalizedReturn<TokenBalance[]>> {
     const udtBalances = await this.service.getTokenAllBalances(
       tokenId,
       isNaN(offset) ? 0 : offset,
       isNaN(limit) ? 10 : limit,
     );
-    return await asyncMap(
-      udtBalances,
-      this.udtBalanceToTokenBalance.bind(this),
-    );
+    return {
+      code: 0,
+      data: await asyncMap(
+        udtBalances,
+        this.udtBalanceToTokenBalance.bind(this),
+      ),
+    };
   }
 }

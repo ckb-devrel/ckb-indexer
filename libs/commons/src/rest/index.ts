@@ -28,6 +28,12 @@ enum ApiHashType {
   Data2 = "data2",
 }
 
+export class NormalizedReturn<T> {
+  code: number;
+  msg?: string;
+  data?: T;
+}
+
 export class CellScript {
   @ApiProperty({ type: String })
   codeHash: ccc.Hex;

@@ -2,6 +2,7 @@ import {
   ApiError,
   assert,
   BlockHeader,
+  NormalizedReturn,
   parseSortableInt,
   RpcError,
 } from "@app/commons";
@@ -23,7 +24,7 @@ export class BlockController {
     description: "Get tip block",
   })
   @Get("/blocks/latest")
-  async getLatestBlock(): Promise<BlockHeader | ApiError> {
+  async getLatestBlock(): Promise<NormalizedReturn<BlockHeader>> {
     try {
       const tipHeader = assert(
         await this.service.getBlockHeader({
@@ -32,15 +33,21 @@ export class BlockController {
         RpcError.BlockNotFound,
       );
       return {
-        version: 0,
-        preHash: ccc.hexFrom(tipHeader.parentHash),
-        height: ccc.numFrom(tipHeader.height),
-        timestamp: tipHeader.timestamp,
-        hash: ccc.hexFrom(tipHeader.hash),
+        code: 0,
+        data: {
+          version: 0,
+          preHash: ccc.hexFrom(tipHeader.parentHash),
+          height: ccc.numFrom(tipHeader.height),
+          timestamp: tipHeader.timestamp,
+          hash: ccc.hexFrom(tipHeader.hash),
+        },
       };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
@@ -53,7 +60,7 @@ export class BlockController {
   @Get("/blocks/by-number/:blockNumber")
   async getBlockHeaderByNumber(
     @Param("blockNumber") blockNumber: number,
-  ): Promise<BlockHeader | ApiError> {
+  ): Promise<NormalizedReturn<BlockHeader>> {
     try {
       const blockHeader = assert(
         await this.service.getBlockHeader({
@@ -63,15 +70,21 @@ export class BlockController {
         RpcError.BlockNotFound,
       );
       return {
-        version: 0,
-        preHash: ccc.hexFrom(blockHeader.parentHash),
-        height: parseSortableInt(blockHeader.height),
-        timestamp: blockHeader.timestamp,
-        hash: ccc.hexFrom(blockHeader.hash),
+        code: 0,
+        data: {
+          version: 0,
+          preHash: ccc.hexFrom(blockHeader.parentHash),
+          height: parseSortableInt(blockHeader.height),
+          timestamp: blockHeader.timestamp,
+          hash: ccc.hexFrom(blockHeader.hash),
+        },
       };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
