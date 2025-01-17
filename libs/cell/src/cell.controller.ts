@@ -5,6 +5,7 @@ import {
   Chain,
   extractIsomorphicInfo,
   IsomorphicBinding,
+  NormalizedReturn,
   PagedTokenResult,
   RpcError,
   ScriptMode,
@@ -86,17 +87,23 @@ export class CellController {
   async getCellByOutpoint(
     @Param("txHash") txHash: string,
     @Param("index") index: number,
-  ): Promise<TokenCell | ApiError> {
+  ): Promise<NormalizedReturn<TokenCell>> {
     try {
       const { cell, spender } = assert(
         await this.service.getCellByOutpoint(txHash, index),
         RpcError.CkbCellNotFound,
       );
       assert(cell.cellOutput.type, RpcError.CellNotAsset);
-      return await this.cellToTokenCell(cell, spender);
+      return {
+        code: 0,
+        data: await this.cellToTokenCell(cell, spender),
+      };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
@@ -110,17 +117,23 @@ export class CellController {
   async getIsomorphicCellByUtxo(
     @Param("btcTxHash") btcTxHash: string,
     @Param("index") index: number,
-  ): Promise<TokenCell | ApiError> {
+  ): Promise<NormalizedReturn<TokenCell>> {
     try {
       const { cell, spender } = assert(
         await this.service.getRgbppCellByUtxo(btcTxHash, index),
         RpcError.RgbppCellNotFound,
       );
       assert(cell.cellOutput.type, RpcError.CellNotAsset);
-      return await this.cellToTokenCell(cell, spender);
+      return {
+        code: 0,
+        data: await this.cellToTokenCell(cell, spender),
+      };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
@@ -147,7 +160,7 @@ export class CellController {
     @Param("address") address: string,
     @Query("limit") limit: number,
     @Query("cursor") cursor?: string,
-  ): Promise<PagedTokenResult> {
+  ): Promise<NormalizedReturn<PagedTokenResult>> {
     const { cells, cursor: lastCursor } =
       await this.service.getPagedTokenCellsByCursor(
         tokenId,
@@ -156,8 +169,11 @@ export class CellController {
         cursor,
       );
     return {
-      cells: await asyncMap(cells, this.cellToTokenCell),
-      cursor: lastCursor,
+      code: 0,
+      data: {
+        cells: await asyncMap(cells, this.cellToTokenCell.bind(this)),
+        cursor: lastCursor,
+      },
     };
   }
 }

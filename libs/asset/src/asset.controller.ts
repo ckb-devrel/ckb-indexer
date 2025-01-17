@@ -6,6 +6,7 @@ import {
   EventType,
   extractIsomorphicInfo,
   IsomorphicBinding,
+  NormalizedReturn,
   RpcError,
   ScriptMode,
   TxAssetCellData,
@@ -252,16 +253,22 @@ export class AssetController {
   @Get("/assetCells/by-transaction/:txHash")
   async queryTxAssetCellDataByTxHash(
     @Param("txHash") txHash: string,
-  ): Promise<TxAssetCellData | ApiError> {
+  ): Promise<NormalizedReturn<TxAssetCellData>> {
     try {
       const { tx, blockHash, blockNumber } = assert(
         await this.service.getTransactionWithBlockByTxHash(txHash),
         RpcError.TxNotFound,
       );
-      return await this.extractTxAssetFromTx(tx, blockHash, blockNumber);
+      return {
+        code: 0,
+        data: await this.extractTxAssetFromTx(tx, blockHash, blockNumber),
+      };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
@@ -274,7 +281,7 @@ export class AssetController {
   @Get("/assetCells/by-block/:blockHash")
   async queryTxAssetCellDataListByBlockHash(
     @Param("blockHash") blockHash: string,
-  ): Promise<TxAssetCellData[] | ApiError> {
+  ): Promise<NormalizedReturn<TxAssetCellData[]>> {
     try {
       const block = assert(
         await this.service.getBlockByBlockHash(blockHash),
@@ -294,10 +301,16 @@ export class AssetController {
           txAssetCellDataList.push(txAssetCellData);
         }
       });
-      return txAssetCellDataList;
+      return {
+        code: 0,
+        data: txAssetCellDataList,
+      };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }

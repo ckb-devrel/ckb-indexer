@@ -4,6 +4,7 @@ import {
   Chain,
   ClusterInfo,
   NFTInfo,
+  NormalizedReturn,
   RpcError,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
@@ -31,7 +32,7 @@ export class SporeController {
   async getSporeClusterById(
     @Param("clusterId") clusterId: string,
     @Query("withDesc") withDesc?: boolean,
-  ): Promise<ClusterInfo | ApiError> {
+  ): Promise<NormalizedReturn<ClusterInfo>> {
     try {
       const cluster = assert(
         await this.service.getCluster(clusterId),
@@ -46,22 +47,28 @@ export class SporeController {
       );
       const rgbppTag = !cluster.ownerAddress.startsWith("ck");
       return {
-        name: cluster.name,
-        description: withDesc ? cluster.description : "",
-        clusterId: ccc.hexFrom(clusterId),
-        itemsCount,
-        holdersCount,
-        owner: cluster.ownerAddress,
-        creator: cluster.creatorAddress,
-        issueTxHeight: height,
-        issueTxId: ccc.hexFrom(cluster.createTxHash),
-        issueTime: timestamp,
-        issueChain: rgbppTag ? Chain.Btc : Chain.Ckb,
-        rgbppTag,
+        code: 0,
+        data: {
+          name: cluster.name,
+          description: withDesc ? cluster.description : "",
+          clusterId: ccc.hexFrom(clusterId),
+          itemsCount,
+          holdersCount,
+          owner: cluster.ownerAddress,
+          creator: cluster.creatorAddress,
+          issueTxHeight: height,
+          issueTxId: ccc.hexFrom(cluster.createTxHash),
+          issueTime: timestamp,
+          issueChain: rgbppTag ? Chain.Btc : Chain.Ckb,
+          rgbppTag,
+        },
       };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
@@ -79,7 +86,7 @@ export class SporeController {
   async getSporeById(
     @Param("sporeId") sporeId: string,
     @Query("withClusterDesc") withClusterDesc?: boolean,
-  ): Promise<NFTInfo | ApiError> {
+  ): Promise<NormalizedReturn<NFTInfo>> {
     try {
       const spore = assert(
         await this.service.getSpore(sporeId),
@@ -100,20 +107,26 @@ export class SporeController {
         }
       }
       return {
-        tokenId: ccc.hexFrom(sporeId),
-        clusterId: spore.clusterId ? ccc.hexFrom(spore.clusterId) : undefined,
-        clusterInfo,
-        contentType: spore.contentType,
-        content: spore.content,
-        creator: spore.creatorAddress,
-        owner: spore.ownerAddress,
-        dobDetails: spore.dobDecoded,
-        createTxId: ccc.hexFrom(spore.createTxHash),
-        createTime: timestamp,
+        code: 0,
+        data: {
+          tokenId: ccc.hexFrom(sporeId),
+          clusterId: spore.clusterId ? ccc.hexFrom(spore.clusterId) : undefined,
+          clusterInfo,
+          contentType: spore.contentType,
+          content: spore.content,
+          creator: spore.creatorAddress,
+          owner: spore.ownerAddress,
+          dobDetails: spore.dobDecoded,
+          createTxId: ccc.hexFrom(spore.createTxHash),
+          createTime: timestamp,
+        },
       };
     } catch (e) {
       if (e instanceof ApiError) {
-        return e;
+        return {
+          code: -1,
+          msg: e.message,
+        };
       }
       throw e;
     }
