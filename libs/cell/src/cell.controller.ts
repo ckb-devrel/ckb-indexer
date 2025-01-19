@@ -171,7 +171,9 @@ export class CellController {
     return {
       code: 0,
       data: {
-        cells: await asyncMap(cells, this.cellToTokenCell.bind(this)),
+        cells: await asyncMap(cells, (cell) => {
+          return this.cellToTokenCell(cell);
+        }),
         cursor: lastCursor,
       },
     };

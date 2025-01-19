@@ -19,6 +19,10 @@ export class CellService {
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
   private readonly btcRequesters: AxiosInstance[];
+  private readonly udtTypes: {
+    codeHash: ccc.HexLike;
+    hashType: ccc.HashTypeLike;
+  }[];
 
   constructor(
     private readonly configService: ConfigService,
@@ -39,16 +43,26 @@ export class CellService {
 
     const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
     this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
+
+    const udtTypes =
+      configService.get<
+        { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
+      >("sync.udtTypes") ?? [];
+    this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
-    return await parseScriptMode(script, this.client, [
-      {
-        codeHash: this.rgbppBtcCodeHash,
-        hashType: this.rgbppBtcHashType,
-        mode: ScriptMode.RgbppBtc,
-      },
-    ]);
+    const extension = this.udtTypes.map((t) => ({
+      codeHash: ccc.hexFrom(t.codeHash),
+      hashType: ccc.hashTypeFrom(t.hashType),
+      mode: ScriptMode.Udt,
+    }));
+    extension.push({
+      codeHash: this.rgbppBtcCodeHash,
+      hashType: this.rgbppBtcHashType,
+      mode: ScriptMode.RgbppBtc,
+    });
+    return await parseScriptMode(script, this.client, extension);
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {
