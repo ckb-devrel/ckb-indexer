@@ -287,7 +287,7 @@ export class CellService {
     );
     return {
       cells: result.cells,
-      cursor: result.lastCursor,
+      cursor: result.cells.length < limit ? "" : result.lastCursor,
     };
   }
 }
