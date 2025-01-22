@@ -18,6 +18,7 @@ export enum ScriptMode {
   Acp = "acp",
   Secp256k1 = "secp256k1",
   JoyId = "joyId",
+  UniqueType = "uniqueType",
   Unknown = "unknown",
 }
 
@@ -182,6 +183,7 @@ export class NFTInfo {
 }
 
 export enum EventType {
+  Issue = "issue",
   Mint = "mint",
   Transfer = "transfer",
   MintAndTransfer = "mint&transfer",
