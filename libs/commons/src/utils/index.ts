@@ -163,6 +163,7 @@ export async function parseScriptMode(
     [ccc.KnownScript.AnyoneCanPay]: ScriptMode.Acp,
     [ccc.KnownScript.Secp256k1Blake160]: ScriptMode.Secp256k1,
     [ccc.KnownScript.JoyId]: ScriptMode.JoyId,
+    [ccc.KnownScript.UniqueType]: ScriptMode.UniqueType,
   };
   for (const [knownScript, mode] of Object.entries(paris)) {
     const expectedScript = await client.getKnownScript(
@@ -232,13 +233,17 @@ export async function parseBtcAddress(params: {
       params: [txId.slice(2), true],
     });
 
+    const rpcError = data?.error ? JSON.stringify(data?.error) : undefined;
     if (
-      data?.error &&
-      !JSON.stringify(data?.error).includes(
-        "No such mempool or blockchain transaction.",
+      error !== undefined &&
+      // From BTC core
+      !error?.includes("No such mempool or blockchain transaction.") &&
+      // From Ankr's BTC rpc
+      !error?.includes(
+        "Retry failed, reason: Node responded with non success status code",
       )
     ) {
-      error = data.error;
+      error = rpcError;
       continue;
     }
 

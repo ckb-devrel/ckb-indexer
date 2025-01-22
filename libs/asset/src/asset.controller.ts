@@ -25,7 +25,7 @@ import { AssetService } from "./asset.service";
 export class AssetController {
   constructor(private readonly service: AssetService) {}
 
-  async extractCellAssetFromCell(
+  async cellDetialWithoutAssets(
     cell: ccc.Cell,
     index: number,
     eventType: EventType,
@@ -62,6 +62,19 @@ export class AssetController {
       typeCodeName: await this.service.scriptMode(typeScript),
       rgbppBinding: isomorphicBinding,
     };
+    return cellAsset;
+  }
+
+  async extractCellAssetFromCell(
+    cell: ccc.Cell,
+    index: number,
+    eventType: EventType,
+  ): Promise<TxAssetCellDetail> {
+    const cellAsset = await this.cellDetialWithoutAssets(
+      cell,
+      index,
+      eventType,
+    );
 
     const token = await this.service.getTokenFromCell(cell);
     if (token) {
@@ -82,6 +95,10 @@ export class AssetController {
         clusterName: cluster.name,
         clusterDescription: cluster.description,
       };
+      // cluster mint event should be replaced with issue event
+      if (eventType === EventType.Mint) {
+        cellAsset.eventType = EventType.Issue;
+      }
     }
 
     const spore = await this.service.getSporeFromCell(cell);
@@ -124,6 +141,7 @@ export class AssetController {
       }
     > = {};
 
+    // extract and parse inputs
     const inputCells = await this.service.extractCellsFromTxInputs(tx);
     for (const [index, input] of inputCells.entries()) {
       if (input.cell.cellOutput.type === undefined) {
@@ -158,6 +176,7 @@ export class AssetController {
       txAssetData.inputs.push(cellAsset);
     }
 
+    // extract and parse outputs
     const outputCells = await this.service.extractCellsFromTxOutputs(tx);
     for (const [index, output] of outputCells.entries()) {
       if (output.cell.cellOutput.type === undefined) {
@@ -204,6 +223,7 @@ export class AssetController {
       txAssetData.outputs.push(cellAsset);
     }
 
+    // re-manage token events based on the calculation of token diffs
     for (const group of Object.values(tokenGroups)) {
       if (group.input.totalBalance === 0n || group.output.totalBalance === 0n) {
         continue;
@@ -239,6 +259,30 @@ export class AssetController {
             (txAssetData.outputs[index].eventType = EventType.MintAndTransfer),
         );
         continue;
+      }
+    }
+
+    // filter and append token metadata which uses unique type as identifier
+    const groupKeys = Object.keys(tokenGroups);
+    if (groupKeys.length > 0) {
+      const firstTokenId = groupKeys[0];
+      for (const [index, output] of txAssetData.outputs.entries()) {
+        if (output.typeCodeName === ScriptMode.UniqueType) {
+          const tokenMetadata = await this.service.getUniqueInfoFromCell(
+            outputCells[index].cell,
+          );
+          if (tokenMetadata) {
+            const tokenId = ccc.hexFrom(firstTokenId);
+            txAssetData.outputs[index].tokenData = {
+              tokenId,
+              name: tokenMetadata.name ?? undefined,
+              symbol: tokenMetadata.symbol ?? undefined,
+              decimal: tokenMetadata.decimals ?? undefined,
+              amount: tokenGroups[tokenId].output.totalBalance,
+            };
+            txAssetData.outputs[index].eventType = EventType.Issue;
+          }
+        }
       }
     }
 

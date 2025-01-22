@@ -229,6 +229,52 @@ export class AssetService {
     };
   }
 
+  async getUniqueInfoFromCell(cell: ccc.Cell): Promise<UdtInfo | undefined> {
+    if (!cell.cellOutput.type) {
+      return;
+    }
+    const mode = await this.scriptMode(cell.cellOutput.type);
+    if (mode !== ScriptMode.UniqueType) {
+      return;
+    }
+    const outputData = ccc.bytesFrom(cell.outputData);
+    // | decimals | name len |  ... name ...  | symbol len |  ... symbol ...  |
+    // | 1 bytes  | 1 bytes  | name len bytes | 1 bytes    | symbol len bytes |
+    if (outputData.length < 1) {
+      return;
+    }
+    const decimals = Number(ccc.numFromBytes(outputData.slice(0, 1)));
+
+    const udtInfo = this.udtInfoRepo.create({
+      decimals,
+    });
+
+    if (outputData.length < 2) {
+      return udtInfo;
+    }
+    const nameLen = Number(ccc.numFromBytes(outputData.slice(1, 2)));
+    if (outputData.length < 2 + nameLen) {
+      return udtInfo;
+    }
+    udtInfo.name = ccc.bytesTo(outputData.slice(2, 2 + nameLen), "utf8");
+
+    if (outputData.length < 3 + nameLen) {
+      return udtInfo;
+    }
+    const symbolLen = Number(
+      ccc.numFromBytes(outputData.slice(2 + nameLen, 3 + nameLen)),
+    );
+    if (outputData.length < 3 + nameLen + symbolLen) {
+      return udtInfo;
+    }
+    udtInfo.symbol = ccc.bytesTo(
+      outputData.slice(3 + nameLen, 3 + nameLen + symbolLen),
+      "utf8",
+    );
+
+    return udtInfo;
+  }
+
   async getClusterInfoFromCell(cell: ccc.Cell): Promise<Cluster | undefined> {
     if (!cell.cellOutput.type) {
       return;
