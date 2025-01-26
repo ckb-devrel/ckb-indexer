@@ -67,6 +67,7 @@ export enum RpcError {
   CellNotAsset,
   ClusterNotFound,
   SporeNotFound,
+  IsomorphicBindingNotFound,
 }
 
 export const RpcErrorMessage: Record<RpcError, string> = {
@@ -78,6 +79,7 @@ export const RpcErrorMessage: Record<RpcError, string> = {
   [RpcError.CellNotAsset]: "Cell is not an asset",
   [RpcError.ClusterNotFound]: "Cluster not found",
   [RpcError.SporeNotFound]: "Spore not found",
+  [RpcError.IsomorphicBindingNotFound]: "Isomorphic binding not found",
 };
 
 export class ApiError {
@@ -279,4 +281,15 @@ export function extractIsomorphicInfo(
 
   const { outIndex, txId } = decoded;
   return { txHash: txId, index: outIndex };
+}
+
+export function mintableScriptMode(scriptMode: ScriptMode): boolean {
+  const unmintable = [
+    ScriptMode.SingleUseLock,
+    ScriptMode.RgbppBtc,
+    ScriptMode.RgbppDoge,
+    ScriptMode.RgbppBtcTimelock,
+    ScriptMode.RgbppDogeTimelock,
+  ].includes(scriptMode);
+  return !unmintable;
 }
