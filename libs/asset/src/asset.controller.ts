@@ -6,6 +6,7 @@ import {
   EventType,
   extractIsomorphicInfo,
   IsomorphicBinding,
+  LeapType,
   NormalizedReturn,
   RpcError,
   ScriptMode,
@@ -25,7 +26,7 @@ import { AssetService } from "./asset.service";
 export class AssetController {
   constructor(private readonly service: AssetService) {}
 
-  async cellDetialWithoutAssets(
+  async cellDetailWithoutAssets(
     cell: ccc.Cell,
     index: number,
     eventType: EventType,
@@ -42,6 +43,7 @@ export class AssetController {
               chain: Chain.Btc,
               txHash: ccc.hexFrom(isomorphicInfo.txHash),
               vout: Number(isomorphicInfo.index),
+              leapType: LeapType.None, // default is none
             };
           }
           break;
@@ -50,6 +52,7 @@ export class AssetController {
             chain: Chain.Doge,
             txHash: ccc.hexFrom(isomorphicInfo.txHash),
             vout: Number(isomorphicInfo.index),
+            leapType: LeapType.None, // default is none
           };
         }
       }
@@ -70,7 +73,7 @@ export class AssetController {
     index: number,
     eventType: EventType,
   ): Promise<TxAssetCellDetail> {
-    const cellAsset = await this.cellDetialWithoutAssets(
+    const cellAsset = await this.cellDetailWithoutAssets(
       cell,
       index,
       eventType,
@@ -78,9 +81,10 @@ export class AssetController {
 
     const token = await this.service.getTokenFromCell(cell);
     if (token) {
-      const { tokenInfo, balance } = token;
+      const { tokenInfo, balance, mintable } = token;
       cellAsset.tokenData = {
         tokenId: ccc.hexFrom(tokenInfo.hash),
+        mintable,
         name: tokenInfo.name ?? undefined,
         symbol: tokenInfo.symbol ?? undefined,
         decimal: tokenInfo.decimals ?? undefined,
@@ -136,6 +140,7 @@ export class AssetController {
         };
         output: {
           totalBalance: ccc.Num;
+          mintable: boolean;
           indices: Array<number>;
         };
       }
@@ -168,6 +173,7 @@ export class AssetController {
             },
             output: {
               totalBalance: ccc.numFrom(0),
+              mintable: cellAsset.tokenData.mintable,
               indices: [],
             },
           };
@@ -215,6 +221,7 @@ export class AssetController {
             },
             output: {
               totalBalance: cellAsset.tokenData.amount,
+              mintable: cellAsset.tokenData.mintable,
               indices: [txAssetData.outputs.length],
             },
           };
@@ -275,6 +282,7 @@ export class AssetController {
             const tokenId = ccc.hexFrom(firstTokenId);
             txAssetData.outputs[index].tokenData = {
               tokenId,
+              mintable: tokenGroups[tokenId].output.mintable,
               name: tokenMetadata.name ?? undefined,
               symbol: tokenMetadata.symbol ?? undefined,
               decimal: tokenMetadata.decimals ?? undefined,
@@ -286,6 +294,32 @@ export class AssetController {
       }
     }
 
+    return this.filterAndChangeLeapTypes(txAssetData);
+  }
+
+  filterAndChangeLeapTypes(txAssetData: TxAssetCellData): TxAssetCellData {
+    for (const rgbppChain of [Chain.Btc, Chain.Doge]) {
+      const hasRgbppModeInInputs = txAssetData.inputs.some(
+        (input) => input.rgbppBinding?.chain === rgbppChain,
+      );
+      const hasRgbppModeInOutputs = txAssetData.outputs.some(
+        (output) => output.rgbppBinding?.chain === rgbppChain,
+      );
+      if (hasRgbppModeInInputs && !hasRgbppModeInOutputs) {
+        for (let i = 0; i < txAssetData.inputs.length; i++) {
+          if (txAssetData.inputs[i].rgbppBinding?.chain === rgbppChain) {
+            txAssetData.inputs[i].rgbppBinding!.leapType = LeapType.FromUtxo;
+          }
+        }
+      }
+      if (!hasRgbppModeInInputs && hasRgbppModeInOutputs) {
+        for (let i = 0; i < txAssetData.outputs.length; i++) {
+          if (txAssetData.outputs[i].rgbppBinding?.chain === rgbppChain) {
+            txAssetData.outputs[i].rgbppBinding!.leapType = LeapType.ToUtxo;
+          }
+        }
+      }
+    }
     return txAssetData;
   }
 

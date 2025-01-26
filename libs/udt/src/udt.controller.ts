@@ -39,6 +39,7 @@ export class UdtController {
       decimal: udtInfo.decimals ?? undefined,
       address: udtBalance.address,
       balance: ccc.numFrom(udtBalance.balance),
+      height: parseSortableInt(udtBalance.updatedAtHeight),
     };
   }
 
@@ -119,12 +120,52 @@ export class UdtController {
     required: false,
     description: "The ID of the token to filter balances (optional)",
   })
+  @ApiQuery({
+    name: "height",
+    required: false,
+    description: "The height of the block to query (optional)",
+  })
   @Get("/tokens/balances/:address")
   async getTokenBalances(
     @Param("address") address: string,
     @Query("tokenId") tokenId?: string,
+    @Query("height") height?: number,
   ): Promise<NormalizedReturn<TokenBalance[]>> {
-    const udtBalances = await this.service.getTokenBalance(address, tokenId);
+    const udtBalances = await this.service.getTokenBalanceByAddress(
+      address,
+      tokenId,
+      height ? ccc.numFrom(height) : undefined,
+    );
+    return {
+      code: 0,
+      data: await asyncMap(
+        udtBalances,
+        this.udtBalanceToTokenBalance.bind(this),
+      ),
+    };
+  }
+
+  @ApiOkResponse({
+    type: [TokenBalance],
+    description:
+      "Get detailed token balances under a token id, filtered by addresses",
+  })
+  @ApiQuery({
+    name: "height",
+    required: false,
+    description: "The height of the block to query (optional)",
+  })
+  @Get("/tokens/balances/:tokenId/:addresses")
+  async batchGetTokenBalances(
+    @Param("tokenId") tokenId: string,
+    @Param("addresses") addresses: string,
+    @Query("height") height?: number,
+  ): Promise<NormalizedReturn<TokenBalance[]>> {
+    const udtBalances = await this.service.getTokenBalanceByTokenId(
+      tokenId,
+      addresses.split(","),
+      height ? ccc.numFrom(height) : undefined,
+    );
     return {
       code: 0,
       data: await asyncMap(

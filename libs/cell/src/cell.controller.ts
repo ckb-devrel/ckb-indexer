@@ -5,6 +5,7 @@ import {
   Chain,
   extractIsomorphicInfo,
   IsomorphicBinding,
+  LeapType,
   NormalizedReturn,
   PagedTokenResult,
   RpcError,
@@ -24,34 +25,71 @@ import { CellService } from "./cell.service";
 export class CellController {
   constructor(private readonly service: CellService) {}
 
+  async parseIsomorphicBinding(
+    cell: ccc.Cell,
+  ): Promise<IsomorphicBinding | undefined> {
+    let isomorphicBinding: IsomorphicBinding | undefined = undefined;
+    const lockScriptMode = await this.service.scriptMode(cell.cellOutput.lock);
+    const tx = assert(
+      await this.service.getTxByCell(cell),
+      RpcError.TxNotFound,
+    );
+    // rgbpp lock related modes
+    for (const { mode, chain } of [
+      { mode: ScriptMode.RgbppBtc, chain: Chain.Btc },
+      { mode: ScriptMode.RgbppDoge, chain: Chain.Doge },
+    ]) {
+      if (lockScriptMode === mode) {
+        const isomorphicInfo = assert(
+          extractIsomorphicInfo(cell.cellOutput.lock),
+          RpcError.IsomorphicBindingNotFound,
+        );
+        const rgbppMode = await this.service.getScriptByModeFromTxInputs(
+          tx,
+          mode,
+        );
+        isomorphicBinding = {
+          chain,
+          txHash: ccc.hexFrom(isomorphicInfo.txHash),
+          vout: Number(isomorphicInfo.index),
+          leapType: rgbppMode ? LeapType.None : LeapType.ToUtxo,
+        };
+        break;
+      }
+    }
+    // rgbpp timelock related modes
+    for (const { mode, chain } of [
+      { mode: ScriptMode.RgbppBtcTimelock, chain: Chain.Btc },
+      { mode: ScriptMode.RgbppDogeTimelock, chain: Chain.Doge },
+    ]) {
+      if (lockScriptMode === mode) {
+        const rgbppScript = assert(
+          await this.service.getScriptByModeFromTxInputs(tx, mode),
+          RpcError.RgbppCellNotFound,
+        );
+        const isomorphicInfo = assert(
+          extractIsomorphicInfo(rgbppScript),
+          RpcError.IsomorphicBindingNotFound,
+        );
+        isomorphicBinding = {
+          chain,
+          txHash: ccc.hexFrom(isomorphicInfo.txHash),
+          vout: Number(isomorphicInfo.index),
+          leapType: LeapType.FromUtxo,
+        };
+        break;
+      }
+    }
+    return isomorphicBinding;
+  }
+
   async cellToTokenCell(
     cell: ccc.Cell,
     spender?: ccc.OutPoint,
   ): Promise<TokenCell> {
     const address = await this.service.scriptToAddress(cell.cellOutput.lock);
     const lockScriptMode = await this.service.scriptMode(cell.cellOutput.lock);
-    const isomorphicInfo = extractIsomorphicInfo(cell.cellOutput.lock);
-    let isomorphicBinding: IsomorphicBinding | undefined = undefined;
-    if (isomorphicInfo) {
-      switch (lockScriptMode) {
-        case ScriptMode.RgbppBtc: {
-          isomorphicBinding = {
-            chain: Chain.Btc,
-            txHash: ccc.hexFrom(isomorphicInfo.txHash),
-            vout: Number(isomorphicInfo.index),
-          };
-          break;
-        }
-        case ScriptMode.RgbppDoge: {
-          isomorphicBinding = {
-            chain: Chain.Doge,
-            txHash: ccc.hexFrom(isomorphicInfo.txHash),
-            vout: Number(isomorphicInfo.index),
-          };
-          break;
-        }
-      }
-    }
+    const isomorphicBinding = await this.parseIsomorphicBinding(cell);
     const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
     const typeScriptType = await this.service.scriptMode(typeScript);
     return {
@@ -87,10 +125,11 @@ export class CellController {
   async getCellByOutpoint(
     @Param("txHash") txHash: string,
     @Param("index") index: number,
+    @Query("containSpender") containSpender: boolean,
   ): Promise<NormalizedReturn<TokenCell>> {
     try {
       const { cell, spender } = assert(
-        await this.service.getCellByOutpoint(txHash, index),
+        await this.service.getCellByOutpoint(txHash, index, containSpender),
         RpcError.CkbCellNotFound,
       );
       assert(cell.cellOutput.type, RpcError.CellNotAsset);

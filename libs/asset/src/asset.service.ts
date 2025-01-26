@@ -1,5 +1,6 @@
 import {
   assertConfig,
+  mintableScriptMode,
   parseBtcAddress,
   parseScriptMode,
   ScriptMode,
@@ -17,6 +18,8 @@ export class AssetService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
+  private readonly rgbppBtcTimelockCodeHash: ccc.Hex;
+  private readonly rgbppBtcTimelockHashType: ccc.HashType;
   private readonly udtTypes: {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
@@ -41,6 +44,12 @@ export class AssetService {
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
+    this.rgbppBtcTimelockCodeHash = ccc.hexFrom(
+      assertConfig(configService, "sync.rgbppBtcTimelockCodeHash"),
+    );
+    this.rgbppBtcTimelockHashType = ccc.hashTypeFrom(
+      assertConfig(configService, "sync.rgbppBtcTimelockHashType"),
+    );
 
     const udtTypes =
       configService.get<
@@ -59,6 +68,11 @@ export class AssetService {
       codeHash: this.rgbppBtcCodeHash,
       hashType: this.rgbppBtcHashType,
       mode: ScriptMode.RgbppBtc,
+    });
+    extension.push({
+      codeHash: this.rgbppBtcTimelockCodeHash,
+      hashType: this.rgbppBtcTimelockHashType,
+      mode: ScriptMode.RgbppBtcTimelock,
     });
     return await parseScriptMode(script, this.client, extension);
   }
@@ -199,6 +213,7 @@ export class AssetService {
   async getTokenFromCell(cell: ccc.Cell): Promise<
     | {
         tokenInfo: UdtInfo;
+        mintable: boolean;
         balance: ccc.Num;
       }
     | undefined
@@ -220,8 +235,10 @@ export class AssetService {
         typeArgs: cell.cellOutput.type.args,
       });
     const tokenAmount = ccc.udtBalanceFrom(cell.outputData);
+    const lockMode = await this.scriptMode(cell.cellOutput.lock);
     return {
       tokenInfo,
+      mintable: mintableScriptMode(lockMode),
       balance: tokenAmount,
     };
   }
