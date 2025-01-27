@@ -1,7 +1,7 @@
 import { assertConfig, parseBtcAddress } from "@app/commons";
 import { Cluster, Spore } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
 import { ClusterRepo, SporeRepo } from "./repos";
@@ -12,12 +12,12 @@ export class SporeService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
-  private readonly btcRequesters: AxiosInstance[];
 
   constructor(
     private readonly configService: ConfigService,
     private readonly clusterRepo: ClusterRepo,
     private readonly sporeRepo: SporeRepo,
+    @Inject("BTC_REQUESTERS") private readonly btcRequesters: AxiosInstance[],
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -31,9 +31,6 @@ export class SporeService {
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
-
-    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
-    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   async scriptToAddress(scriptLike: ccc.ScriptLike): Promise<string> {

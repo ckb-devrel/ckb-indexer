@@ -9,7 +9,7 @@ import {
 import { ccc } from "@ckb-ccc/shell";
 import { cccA } from "@ckb-ccc/shell/advanced";
 import { spore } from "@ckb-ccc/spore";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
@@ -22,7 +22,6 @@ export class SporeParserBuilder {
   public readonly client: ccc.Client;
   public readonly decoderUri: string;
 
-  public readonly btcRequesters: AxiosInstance[];
   public readonly rgbppBtcCodeHash: ccc.Hex;
   public readonly rgbppBtcHashType: ccc.HashType;
 
@@ -30,6 +29,7 @@ export class SporeParserBuilder {
     configService: ConfigService,
     public readonly entityManager: EntityManager,
     public readonly sporeRepo: SporeRepo,
+    @Inject("BTC_REQUESTERS") private readonly btcRequesters: AxiosInstance[],
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -44,9 +44,6 @@ export class SporeParserBuilder {
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
-
-    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
-    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   build(blockHeight: ccc.NumLike): SporeParser {

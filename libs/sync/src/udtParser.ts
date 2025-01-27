@@ -8,9 +8,9 @@ import {
 } from "@app/commons";
 import { ScriptCode } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
 import { ScriptCodeRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
 
@@ -49,7 +49,6 @@ async function trySsriMethod<T>(
 @Injectable()
 export class UdtParser {
   public readonly logger = new Logger(UdtParser.name);
-  public readonly btcRequesters: AxiosInstance[];
   public readonly client: ccc.Client;
   public readonly executor: ccc.ssri.Executor;
 
@@ -63,6 +62,7 @@ export class UdtParser {
     public readonly entityManager: EntityManager,
     public readonly udtInfoRepo: UdtInfoRepo,
     public readonly scriptCodeRepo: ScriptCodeRepo,
+    @Inject("BTC_REQUESTERS") private readonly btcRequesters: AxiosInstance[],
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ssriServerUri = assertConfig<string>(
@@ -97,9 +97,6 @@ export class UdtParser {
         { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
       >("sync.udtTypes") ?? [];
     this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
-
-    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
-    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
   }
 
   async udtInfoHandleTx(tx: ccc.Transaction) {

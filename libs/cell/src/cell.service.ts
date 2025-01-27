@@ -8,7 +8,7 @@ import {
   ScriptMode,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
 import { UdtInfoRepo } from "./repos";
@@ -18,7 +18,6 @@ export class CellService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
-  private readonly btcRequesters: AxiosInstance[];
   private readonly udtTypes: {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
@@ -27,6 +26,7 @@ export class CellService {
   constructor(
     private readonly configService: ConfigService,
     private readonly udtInfoRepo: UdtInfoRepo,
+    @Inject("BTC_REQUESTERS") private readonly btcRequesters: AxiosInstance[],
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -40,9 +40,6 @@ export class CellService {
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
-
-    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
-    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
 
     const udtTypes =
       configService.get<

@@ -47,5 +47,7 @@ sync:
   decoderServerUri: http://decoder:8090
   ssriServerUri: http://ssri:9090
 
-  btcRpcUris: 
-    - https://rpc.ankr.com/btc
+  btcRpcs:
+    - uri: https://rpc.ankr.com/btc
+      # username: username
+      # password: password
