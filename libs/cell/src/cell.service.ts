@@ -106,11 +106,11 @@ export class CellService {
     scriptMode: ScriptMode,
   ): Promise<ccc.Script | undefined> {
     for (const input of tx.inputs) {
-      const script = await this.client
-        .getCellLive(input.previousOutput)
-        .then((cell) => cell?.cellOutput.lock);
+      await input.completeExtraInfos(this.client);
+      const script = input.cellOutput?.lock;
       if (script) {
         const lockScriptMode = await this.scriptMode(script);
+        console.log("lockScriptMode = ", lockScriptMode);
         if (scriptMode === lockScriptMode) {
           return script;
         }

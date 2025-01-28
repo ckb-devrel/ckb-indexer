@@ -58,13 +58,22 @@ export class CellController {
       }
     }
     // rgbpp timelock related modes
-    for (const { mode, chain } of [
-      { mode: ScriptMode.RgbppBtcTimelock, chain: Chain.Btc },
-      { mode: ScriptMode.RgbppDogeTimelock, chain: Chain.Doge },
+    for (const { mode, premode, chain } of [
+      {
+        mode: ScriptMode.RgbppBtcTimelock,
+        premode: ScriptMode.RgbppBtc,
+        chain: Chain.Btc,
+      },
+      {
+        mode: ScriptMode.RgbppDogeTimelock,
+        premode: ScriptMode.RgbppDoge,
+        chain: Chain.Doge,
+      },
     ]) {
       if (lockScriptMode === mode) {
+        console.log("premode = ", premode);
         const rgbppScript = assert(
-          await this.service.getScriptByModeFromTxInputs(tx, mode),
+          await this.service.getScriptByModeFromTxInputs(tx, premode),
           RpcError.RgbppCellNotFound,
         );
         const isomorphicInfo = assert(
