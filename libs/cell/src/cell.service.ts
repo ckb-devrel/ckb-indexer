@@ -106,7 +106,6 @@ export class CellService {
       const script = input.cellOutput?.lock;
       if (script) {
         const lockScriptMode = await this.scriptMode(script);
-        console.log("lockScriptMode = ", lockScriptMode);
         if (scriptMode === lockScriptMode) {
           return script;
         }
