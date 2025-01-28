@@ -129,15 +129,25 @@ export class CellController {
     type: TokenCell,
     description: "Get an on-chain cell by CKB OutPoint",
   })
+  @ApiQuery({
+    name: "containSpender",
+    required: false,
+    description:
+      "Whether to include the spender information of the cell, default is false (optional)",
+  })
   @Get("/cells/by-outpoint/:txHash/:index")
   async getCellByOutpoint(
     @Param("txHash") txHash: string,
     @Param("index") index: number,
-    @Query("containSpender") containSpender: boolean,
+    @Query("containSpender") containSpender?: boolean,
   ): Promise<NormalizedReturn<TokenCell>> {
     try {
       const { cell, spender } = assert(
-        await this.service.getCellByOutpoint(txHash, index, containSpender),
+        await this.service.getCellByOutpoint(
+          txHash,
+          index,
+          containSpender ?? false,
+        ),
         RpcError.CkbCellNotFound,
       );
       assert(cell.cellOutput.type, RpcError.CellNotAsset);
