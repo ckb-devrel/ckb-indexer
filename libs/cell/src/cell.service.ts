@@ -10,7 +10,7 @@ import {
 import { ccc } from "@ckb-ccc/shell";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import { AxiosInstance } from "axios";
 import { UdtInfoRepo } from "./repos";
 
 @Injectable()
@@ -20,7 +20,6 @@ export class CellService {
   private readonly rgbppBtcHashType: ccc.HashType;
   private readonly rgbppBtcTimelockCodeHash: ccc.Hex;
   private readonly rgbppBtcTimelockHashType: ccc.HashType;
-  private readonly btcRequesters: AxiosInstance[];
   private readonly udtTypes: {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
@@ -50,9 +49,6 @@ export class CellService {
     this.rgbppBtcTimelockHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcTimelockHashType"),
     );
-
-    const btcRpcUris = assertConfig<string[]>(configService, "sync.btcRpcUris");
-    this.btcRequesters = btcRpcUris.map((baseURL) => axios.create({ baseURL }));
 
     const udtTypes =
       configService.get<

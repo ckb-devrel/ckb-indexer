@@ -3,7 +3,7 @@ import { Cluster, Spore } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import { AxiosInstance } from "axios";
 import { ClusterRepo, SporeRepo } from "./repos";
 
 @Injectable()
