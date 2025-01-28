@@ -15,6 +15,9 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     tokenHash?: ccc.HexLike,
     height?: ccc.Num,
   ): Promise<UdtBalance[]> {
+    if (addresses.length === 0) {
+      return [];
+    }
     const addressHashes = addresses.map((address) =>
       ccc.hashCkb(ccc.bytesFrom(address, "utf8")),
     );
@@ -49,15 +52,32 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           },
         });
       } else {
+        // const rawSql = `
+        //   SELECT ub.*
+        //   FROM udt_balance AS ub
+        //   WHERE ub.updatedAtHeight IN (
+        //     SELECT MAX(updatedAtHeight)
+        //     FROM udt_balance
+        //     WHERE addressHash IN (?) AND balance > 0
+        //     GROUP BY tokenHash
+        //   );
+        // `;
         const rawSql = `
-          SELECT ub.*
-          FROM udt_balance AS ub
-          WHERE ub.updatedAtHeight IN (
-            SELECT MAX(updatedAtHeight)
+          WITH LatestRecords AS (
+            SELECT 
+              *,
+              ROW_NUMBER() OVER (
+                PARTITION BY tokenHash 
+                ORDER BY updatedAtHeight DESC
+              ) AS rn
             FROM udt_balance
-            WHERE addressHash = IN (?) AND balance > 0
-            GROUP BY tokenHash
-          );
+            WHERE 
+              addressHash IN (?) 
+              AND balance > 0
+          )
+          SELECT *
+          FROM LatestRecords
+          WHERE rn = 1;
         `;
         return await this.manager.query(rawSql, [addressHashes]);
       }
@@ -88,15 +108,31 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
   }
 
   async getItemCountByTokenHash(tokenHash: ccc.HexLike): Promise<number> {
+    // const rawSql = `
+    //   SELECT COUNT(*) AS holderCount
+    //   FROM (
+    //     SELECT addressHash
+    //     FROM udt_balance
+    //     WHERE tokenHash = ? AND balance > 0
+    //     GROUP BY addressHash, tokenHash
+    //     HAVING MAX(updatedAtHeight)
+    //   ) AS grouped_holders;
+    // `;
     const rawSql = `
-      SELECT COUNT(*) AS holderCount
-      FROM (
-        SELECT addressHash
+      WITH LatestBalances AS (
+        SELECT 
+          addressHash,
+          ROW_NUMBER() OVER (
+            PARTITION BY addressHash 
+            ORDER BY updatedAtHeight DESC
+          ) AS rn,
+          balance
         FROM udt_balance
-        WHERE tokenHash = ? AND balance > 0
-        GROUP BY addressHash, tokenHash
-        HAVING MAX(updatedAtHeight)
-      ) AS grouped_holders;
+        WHERE tokenHash = ?
+      )
+      SELECT COUNT(DISTINCT addressHash) AS holderCount
+      FROM LatestBalances
+      WHERE rn = 1 AND balance > 0;
     `;
     const result = await this.manager.query(rawSql, [ccc.hexFrom(tokenHash)]);
     return parseInt(result[0].holderCount, 10) || 0;
