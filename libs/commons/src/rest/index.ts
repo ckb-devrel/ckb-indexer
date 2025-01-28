@@ -10,6 +10,8 @@ export enum Chain {
 export enum ScriptMode {
   RgbppBtc = "rgbppBtc",
   RgbppDoge = "rgbppDoge",
+  RgbppBtcTimelock = "rgbppBtcTimelock",
+  RgbppDogeTimelock = "rgbppDogeTimelock",
   SingleUseLock = "singleUseLock",
   OmniLock = "omniLock",
   Udt = "udt",
@@ -27,6 +29,12 @@ enum ApiHashType {
   Type = "type",
   Data1 = "data1",
   Data2 = "data2",
+}
+
+export enum LeapType {
+  None = 0,
+  FromUtxo = 1,
+  ToUtxo = 2,
 }
 
 export class NormalizedReturn<T> {
@@ -86,6 +94,8 @@ export class TokenBalance {
   address: string;
   @ApiProperty({ type: Number })
   balance: ccc.Num;
+  @ApiProperty({ type: Number })
+  height: ccc.Num;
 }
 
 export class BlockHeader {
@@ -211,6 +221,8 @@ export class TokenData {
   tokenId: ccc.Hex;
   @ApiProperty({ type: Number })
   amount: ccc.Num;
+  @ApiProperty()
+  mintable: boolean;
   @ApiPropertyOptional()
   name?: string;
   @ApiPropertyOptional()
@@ -226,6 +238,8 @@ export class IsomorphicBinding {
   txHash: ccc.Hex;
   @ApiProperty({ type: Number })
   vout: number;
+  @ApiProperty({ enum: LeapType })
+  leapType: LeapType;
 }
 
 export class TxAssetCellDetail {

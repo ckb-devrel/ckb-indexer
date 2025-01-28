@@ -97,11 +97,28 @@ export class UdtService {
     return this.udtBalanceRepo.getItemCountByTokenHash(tokenId);
   }
 
-  async getTokenBalance(
+  async getTokenBalanceByAddress(
     address: string,
     tokenId?: ccc.HexLike,
+    height?: ccc.Num,
   ): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenItemsByAddress(address, tokenId);
+    return await this.udtBalanceRepo.getTokenItemsByAddress(
+      [address],
+      tokenId,
+      height,
+    );
+  }
+
+  async getTokenBalanceByTokenId(
+    tokenId: ccc.HexLike,
+    addresses: string[],
+    height?: ccc.Num,
+  ): Promise<UdtBalance[]> {
+    return await this.udtBalanceRepo.getTokenItemsByAddress(
+      addresses,
+      tokenId,
+      height,
+    );
   }
 
   async getTokenAllBalances(

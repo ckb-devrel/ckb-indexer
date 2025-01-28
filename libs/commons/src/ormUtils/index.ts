@@ -30,7 +30,8 @@ export async function foreachInRepo<T>({
   while (true) {
     const entities = await repo.find({
       where: lastId
-        ? ({ ...(criteria ?? {}), id: MoreThan(lastId) } as any)
+        ? /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          ({ ...(criteria ?? {}), id: MoreThan(lastId) } as any)
         : criteria,
       order,
       take: chunkSize ?? 100,

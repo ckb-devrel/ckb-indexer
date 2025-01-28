@@ -10,7 +10,7 @@ import {
 import { ccc } from "@ckb-ccc/shell";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import { AxiosInstance } from "axios";
 import { UdtInfoRepo } from "./repos";
 
 @Injectable()
@@ -18,6 +18,8 @@ export class CellService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
+  private readonly rgbppBtcTimelockCodeHash: ccc.Hex;
+  private readonly rgbppBtcTimelockHashType: ccc.HashType;
   private readonly udtTypes: {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
@@ -41,6 +43,13 @@ export class CellService {
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
 
+    this.rgbppBtcTimelockCodeHash = ccc.hexFrom(
+      assertConfig(configService, "sync.rgbppBtcTimelockCodeHash"),
+    );
+    this.rgbppBtcTimelockHashType = ccc.hashTypeFrom(
+      assertConfig(configService, "sync.rgbppBtcTimelockHashType"),
+    );
+
     const udtTypes =
       configService.get<
         { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
@@ -58,6 +67,11 @@ export class CellService {
       codeHash: this.rgbppBtcCodeHash,
       hashType: this.rgbppBtcHashType,
       mode: ScriptMode.RgbppBtc,
+    });
+    extension.push({
+      codeHash: this.rgbppBtcTimelockCodeHash,
+      hashType: this.rgbppBtcTimelockHashType,
+      mode: ScriptMode.RgbppBtcTimelock,
     });
     return await parseScriptMode(script, this.client, extension);
   }
@@ -77,9 +91,33 @@ export class CellService {
     return ccc.Address.fromScript(script, this.client).toString();
   }
 
+  async getTxByCell(cell: ccc.Cell): Promise<ccc.Transaction | undefined> {
+    return await this.client
+      .getTransaction(cell.outPoint.txHash)
+      .then((tx) => tx?.transaction);
+  }
+
+  async getScriptByModeFromTxInputs(
+    tx: ccc.Transaction,
+    scriptMode: ScriptMode,
+  ): Promise<ccc.Script | undefined> {
+    for (const input of tx.inputs) {
+      await input.completeExtraInfos(this.client);
+      const script = input.cellOutput?.lock;
+      if (script) {
+        const lockScriptMode = await this.scriptMode(script);
+        console.log("lockScriptMode = ", lockScriptMode);
+        if (scriptMode === lockScriptMode) {
+          return script;
+        }
+      }
+    }
+  }
+
   async getCellByOutpoint(
     txHash: ccc.HexLike,
     index: number,
+    containSpender: boolean,
   ): Promise<
     | {
         cell: ccc.Cell;
@@ -90,7 +128,7 @@ export class CellService {
     const cell = await this.client.getCell({ txHash, index });
     if (cell) {
       // If the cell is not an asset, skip finding the spender
-      if (cell.cellOutput.type === undefined) {
+      if (cell.cellOutput.type === undefined || !containSpender) {
         return {
           cell,
         };
@@ -137,7 +175,6 @@ export class CellService {
           };
         }
       }
-      console.log("no spender found");
       return {
         cell,
       };
