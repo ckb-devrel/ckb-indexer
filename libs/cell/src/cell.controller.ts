@@ -71,7 +71,6 @@ export class CellController {
       },
     ]) {
       if (lockScriptMode === mode) {
-        console.log("premode = ", premode);
         const rgbppScript = assert(
           await this.service.getScriptByModeFromTxInputs(tx, premode),
           RpcError.RgbppCellNotFound,
