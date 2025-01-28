@@ -10,7 +10,7 @@ import { ccc } from "@ckb-ccc/shell";
 import { cccA } from "@ckb-ccc/shell/advanced";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import { AxiosInstance } from "axios";
 import { ClusterRepo, SporeRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
