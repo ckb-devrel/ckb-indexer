@@ -11,7 +11,7 @@ import { cccA } from "@ckb-ccc/shell/advanced";
 import { spore } from "@ckb-ccc/spore";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import axios, { AxiosInstance } from "axios";
+import { AxiosInstance } from "axios";
 import { EntityManager } from "typeorm";
 import { ClusterRepo } from "./repos/cluster.repo";
 import { SporeRepo } from "./repos/spore.repo";
