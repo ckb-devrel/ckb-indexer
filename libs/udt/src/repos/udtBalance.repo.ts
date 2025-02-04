@@ -89,22 +89,42 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     offset: number,
     limit: number,
   ): Promise<UdtBalance[]> {
+    // const rawSql = `
+    //   SELECT ub.*
+    //   FROM udt_balance AS ub
+    //   WHERE ub.updatedAtHeight IN (
+    //     SELECT MAX(ub_inner.updatedAtHeight)
+    //     FROM udt_balance AS ub_inner
+    //     WHERE ub_inner.tokenHash = ? AND ub_inner.balance > 0
+    //     GROUP BY ub_inner.addressHash
+    //   )
+    //   LIMIT ? OFFSET ?;
+    // `;
+    // return await this.manager.query(rawSql, [
+    //   ccc.hexFrom(tokenHash),
+    //   limit,
+    //   offset,
+    // ]);
+    const hexToken = ccc.hexFrom(tokenHash);
     const rawSql = `
-      SELECT ub.*
-      FROM udt_balance AS ub
-      WHERE ub.updatedAtHeight IN (
-        SELECT MAX(ub_inner.updatedAtHeight)
-        FROM udt_balance AS ub_inner
-        WHERE ub_inner.tokenHash = ? AND ub_inner.balance > 0
-        GROUP BY ub_inner.addressHash
+      WITH LatestAddresses AS (
+        SELECT 
+          addressHash,
+          MAX(updatedAtHeight) AS max_height
+        FROM udt_balance
+        WHERE tokenHash = ? AND balance > 0
+        GROUP BY addressHash
+        ORDER BY max_height DESC
+        LIMIT ? OFFSET ?
       )
-      LIMIT ? OFFSET ?;
+      SELECT ub.*
+      FROM udt_balance ub
+      JOIN LatestAddresses la 
+        ON ub.addressHash = la.addressHash 
+      AND ub.updatedAtHeight = la.max_height
+      WHERE ub.tokenHash = ?;
     `;
-    return await this.manager.query(rawSql, [
-      ccc.hexFrom(tokenHash),
-      limit,
-      offset,
-    ]);
+    return this.manager.query(rawSql, [hexToken, limit, offset, hexToken]);
   }
 
   async getItemCountByTokenHash(tokenHash: ccc.HexLike): Promise<number> {
