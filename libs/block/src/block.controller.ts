@@ -7,8 +7,8 @@ import {
   RpcError,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param } from "@nestjs/common";
-import { ApiOkResponse } from "@nestjs/swagger";
+import { Controller, Get, Param, Query } from "@nestjs/common";
+import { ApiOkResponse, ApiQuery } from "@nestjs/swagger";
 import { BlockService } from "./block.service";
 
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -23,12 +23,21 @@ export class BlockController {
     type: BlockHeader,
     description: "Get tip block",
   })
+  @ApiQuery({
+    name: "fromDb",
+    required: false,
+    default: true,
+    description:
+      "Determine whether to get the block from the database or from the CKB node",
+  })
   @Get("/blocks/latest")
-  async getLatestBlock(): Promise<NormalizedReturn<BlockHeader>> {
+  async getLatestBlock(
+    @Query("fromDb") fromDb: boolean = true,
+  ): Promise<NormalizedReturn<BlockHeader>> {
     try {
       const tipHeader = assert(
         await this.service.getBlockHeader({
-          fromDb: false,
+          fromDb,
         }),
         RpcError.BlockNotFound,
       );
@@ -57,15 +66,23 @@ export class BlockController {
     type: BlockHeader,
     description: "Get block by block number",
   })
+  @ApiQuery({
+    name: "fromDb",
+    required: false,
+    default: true,
+    description:
+      "Determine whether to get the block from the database or from the CKB node",
+  })
   @Get("/blocks/by-number/:blockNumber")
   async getBlockHeaderByNumber(
     @Param("blockNumber") blockNumber: number,
+    @Query("fromDb") fromDb: boolean = true,
   ): Promise<NormalizedReturn<BlockHeader>> {
     try {
       const blockHeader = assert(
         await this.service.getBlockHeader({
           blockNumber,
-          fromDb: false,
+          fromDb,
         }),
         RpcError.BlockNotFound,
       );
