@@ -373,7 +373,7 @@ export class AssetController {
           block.header.number,
         );
         if (
-          txAssetCellData.inputs.length > 0 &&
+          txAssetCellData.inputs.length > 0 ||
           txAssetCellData.outputs.length > 0
         ) {
           txAssetCellDataList.push(txAssetCellData);
