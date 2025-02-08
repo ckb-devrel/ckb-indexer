@@ -8,13 +8,15 @@ import {
   ScriptMode,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
 import { UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class CellService {
+  private readonly logger = new Logger(CellService.name);
+
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
@@ -85,6 +87,7 @@ export class CellService {
         client: this.client,
         rgbppScript: scriptLike,
         requesters: this.btcRequesters,
+        logger: this.logger,
       });
     }
     const script = ccc.Script.from(scriptLike);

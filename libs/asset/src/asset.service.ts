@@ -8,13 +8,15 @@ import {
 import { Cluster, Spore, UdtInfo } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { cccA } from "@ckb-ccc/shell/advanced";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
 import { ClusterRepo, SporeRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class AssetService {
+  private readonly logger = new Logger(AssetService.name);
+
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
@@ -86,6 +88,7 @@ export class AssetService {
         client: this.client,
         rgbppScript: scriptLike,
         requesters: this.btcRequesters,
+        logger: this.logger,
       });
     }
     const script = ccc.Script.from(scriptLike);

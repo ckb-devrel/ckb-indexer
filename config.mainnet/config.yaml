@@ -1,3 +1,9 @@
+logger:
+  - fatal
+  - error
+  - warn
+  - log
+
 port: 8080
 
 mysql:

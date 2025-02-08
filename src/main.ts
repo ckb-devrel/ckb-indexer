@@ -16,7 +16,7 @@ async function handleRoot(req: any, res: any, next: any) {
 async function bootstrap() {
   const config = loadConfig();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: config.logger });
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   app.use(handleRoot);
   app.enableCors({

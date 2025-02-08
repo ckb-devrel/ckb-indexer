@@ -209,7 +209,7 @@ export async function parseBtcAddress(params: {
   client: ccc.Client;
   rgbppScript: ccc.ScriptLike;
   requesters: AxiosInstance[];
-  logger?: Logger;
+  logger: Logger;
 }): Promise<string> {
   const { client, rgbppScript, requesters, logger } = params;
   const script = ccc.Script.from(rgbppScript);
@@ -230,6 +230,9 @@ export async function parseBtcAddress(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let error: any | undefined = undefined;
   for (const requester of requesters) {
+    logger?.debug(
+      `[parseBtcAddress] Getting ${txId} from ${requester.getUri()}`,
+    );
     const { data } = await requester.post("/", {
       method: "getrawtransaction",
       params: [txId.slice(2), true],

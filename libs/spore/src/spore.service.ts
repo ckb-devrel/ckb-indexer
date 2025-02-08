@@ -42,6 +42,7 @@ export class SporeService {
         client: this.client,
         rgbppScript: scriptLike,
         requesters: this.btcRequesters,
+        logger: this.logger,
       });
     }
     const script = ccc.Script.from(scriptLike);
