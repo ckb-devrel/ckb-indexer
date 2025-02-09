@@ -233,10 +233,19 @@ export async function parseBtcAddress(params: {
     logger?.debug(
       `[parseBtcAddress] Getting ${txId} from ${requester.getUri()}`,
     );
-    const { data } = await requester.post("/", {
-      method: "getrawtransaction",
-      params: [txId.slice(2), true],
-    });
+    const { data } = await (async () => {
+      try {
+        return await requester.post("/", {
+          method: "getrawtransaction",
+          params: [txId.slice(2), true],
+        });
+      } catch (err) {
+        if (err?.response?.data?.error !== undefined) {
+          return err.response;
+        }
+        throw err;
+      }
+    })();
 
     const rpcError = data?.error ? JSON.stringify(data?.error) : undefined;
     if (
