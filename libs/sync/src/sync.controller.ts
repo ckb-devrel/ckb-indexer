@@ -28,13 +28,13 @@ export class SyncController {
     try {
       const dbTip = assert(
         await this.service.getBlockHeader({
-          fromDb: false,
+          fromDb: true,
         }),
         RpcError.BlockNotFound,
       );
       const nodeTip = assert(
         await this.service.getBlockHeader({
-          fromDb: true,
+          fromDb: false,
         }),
         RpcError.BlockNotFound,
       );

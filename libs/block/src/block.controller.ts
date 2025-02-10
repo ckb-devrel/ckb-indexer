@@ -47,7 +47,7 @@ export class BlockController {
           version: 0,
           preHash: ccc.hexFrom(tipHeader.parentHash),
           height: ccc.numFrom(tipHeader.height),
-          timestamp: tipHeader.timestamp,
+          blockTime: tipHeader.timestamp,
           hash: ccc.hexFrom(tipHeader.hash),
         },
       };
@@ -92,7 +92,7 @@ export class BlockController {
           version: 0,
           preHash: ccc.hexFrom(blockHeader.parentHash),
           height: parseSortableInt(blockHeader.height),
-          timestamp: blockHeader.timestamp,
+          blockTime: blockHeader.timestamp,
           hash: ccc.hexFrom(blockHeader.hash),
         },
       };
