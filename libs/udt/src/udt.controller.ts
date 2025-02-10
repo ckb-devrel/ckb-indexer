@@ -38,7 +38,7 @@ export class UdtController {
       symbol: udtInfo.symbol ?? undefined,
       decimal: udtInfo.decimals ?? undefined,
       address: udtBalance.address,
-      balance: ccc.numFrom(udtBalance.balance),
+      balance: parseSortableInt(udtBalance.balance),
       height: parseSortableInt(udtBalance.updatedAtHeight),
     };
   }
@@ -76,11 +76,11 @@ export class UdtController {
           break;
         }
       }
-      const mintable = lockScriptModes.some(
+      const unmintable = lockScriptModes.some(
         (mode) =>
-          mode !== ScriptMode.RgbppBtc &&
-          mode !== ScriptMode.RgbppDoge &&
-          mode !== ScriptMode.SingleUseLock,
+          mode === ScriptMode.RgbppBtc ||
+          mode === ScriptMode.RgbppDoge ||
+          mode === ScriptMode.SingleUseLock,
       );
       return {
         code: 0,
@@ -90,8 +90,8 @@ export class UdtController {
           symbol: udtInfo.symbol ?? undefined,
           decimal: udtInfo.decimals ?? undefined,
           owner: udtInfo.owner ?? undefined,
-          totalAmount: ccc.numFrom(udtInfo.totalSupply),
-          mintable,
+          totalAmount: parseSortableInt(udtInfo.totalSupply),
+          mintable: !unmintable,
           holderCount: ccc.numFrom(holderCount),
           issueChain,
           issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),
@@ -224,7 +224,7 @@ export class UdtController {
       code: 0,
       data: {
         total: udtBalanceTotal,
-        balances: await asyncMap(
+        list: await asyncMap(
           udtBalances,
           this.udtBalanceToTokenBalance.bind(this),
         ),

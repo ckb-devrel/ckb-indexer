@@ -106,7 +106,7 @@ export class BlockHeader {
   @ApiProperty({ type: String })
   preHash: ccc.Hex;
   @ApiProperty()
-  timestamp: number;
+  blockTime: number;
   @ApiProperty()
   version: number;
 }
@@ -312,5 +312,5 @@ export class TokenHolders {
   @ApiProperty()
   total: number;
   @ApiProperty({ type: TokenBalance, isArray: true })
-  balances: TokenBalance[];
+  list: TokenBalance[];
 }
