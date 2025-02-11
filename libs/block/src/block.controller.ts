@@ -2,9 +2,9 @@ import {
   ApiError,
   assert,
   BlockHeader,
-  NormalizedReturn,
   parseSortableInt,
   RpcError,
+  RpcResponse,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
 import { Controller, Get, Param, Query } from "@nestjs/common";
@@ -33,7 +33,7 @@ export class BlockController {
   @Get("/blocks/latest")
   async getLatestBlock(
     @Query("fromDb") fromDb: boolean = true,
-  ): Promise<NormalizedReturn<BlockHeader>> {
+  ): Promise<RpcResponse<BlockHeader>> {
     try {
       const tipHeader = assert(
         await this.service.getBlockHeader({
@@ -77,7 +77,7 @@ export class BlockController {
   async getBlockHeaderByNumber(
     @Param("blockNumber") blockNumber: number,
     @Query("fromDb") fromDb: boolean = true,
-  ): Promise<NormalizedReturn<BlockHeader>> {
+  ): Promise<RpcResponse<BlockHeader>> {
     try {
       const blockHeader = assert(
         await this.service.getBlockHeader({

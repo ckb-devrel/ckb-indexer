@@ -6,9 +6,9 @@ import {
   extractIsomorphicInfo,
   IsomorphicBinding,
   LeapType,
-  NormalizedReturn,
   PagedTokenResult,
   RpcError,
+  RpcResponse,
   ScriptMode,
   TokenCell,
 } from "@app/commons";
@@ -140,7 +140,7 @@ export class CellController {
     @Param("txHash") txHash: string,
     @Param("index") index: number,
     @Query("containSpender") containSpender?: boolean,
-  ): Promise<NormalizedReturn<TokenCell>> {
+  ): Promise<RpcResponse<TokenCell>> {
     try {
       const { cell, spender } = assert(
         await this.service.getCellByOutpoint(
@@ -174,7 +174,7 @@ export class CellController {
   async getIsomorphicCellByUtxo(
     @Param("btcTxHash") btcTxHash: string,
     @Param("index") index: number,
-  ): Promise<NormalizedReturn<TokenCell>> {
+  ): Promise<RpcResponse<TokenCell>> {
     try {
       const { cell, spender } = assert(
         await this.service.getRgbppCellByUtxo(btcTxHash, index),
@@ -217,7 +217,7 @@ export class CellController {
     @Param("address") address: string,
     @Query("limit") limit: number,
     @Query("cursor") cursor?: string,
-  ): Promise<NormalizedReturn<PagedTokenResult>> {
+  ): Promise<RpcResponse<PagedTokenResult>> {
     const { cells, cursor: lastCursor } =
       await this.service.getPagedTokenCellsByCursor(
         tokenId,

@@ -3,9 +3,11 @@ import {
   assert,
   asyncMap,
   Chain,
-  NormalizedReturn,
+  examineAddress,
+  examineTokenId,
   parseSortableInt,
   RpcError,
+  RpcResponse,
   ScriptMode,
   TokenBalance,
   TokenHolders,
@@ -13,13 +15,27 @@ import {
 } from "@app/commons";
 import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
-import { Controller, Get, Param, Query } from "@nestjs/common";
-import { ApiOkResponse, ApiQuery } from "@nestjs/swagger";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { ApiOkResponse, ApiProperty, ApiQuery } from "@nestjs/swagger";
 import { UdtService } from "./udt.service";
 
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
   return this.toString();
 };
+
+class BatchGetTokenBalancesDto {
+  @ApiProperty({ description: "Token ID" })
+  tokenId: string;
+
+  @ApiProperty({ description: "Array of addresses" })
+  addresses: string[];
+
+  @ApiProperty({
+    description: "The height of the block to query",
+    required: false,
+  })
+  height?: number;
+}
 
 @Controller()
 export class UdtController {
@@ -50,8 +66,9 @@ export class UdtController {
   @Get("/tokens/:tokenId")
   async getTokenInfo(
     @Param("tokenId") tokenId: string,
-  ): Promise<NormalizedReturn<TokenInfo>> {
+  ): Promise<RpcResponse<TokenInfo>> {
     try {
+      assert(examineTokenId(tokenId), RpcError.InvalidTokenId);
       const { udtInfo, tx, block } = assert(
         await this.service.getTokenInfo(tokenId, true),
         RpcError.TokenNotFound,
@@ -130,25 +147,37 @@ export class UdtController {
     @Param("address") address: string,
     @Query("tokenId") tokenId?: string,
     @Query("height") height?: number,
-  ): Promise<NormalizedReturn<TokenBalance[]>> {
-    const udtBalances = await this.service.getTokenBalanceByAddress(
-      address,
-      tokenId,
-      height ? ccc.numFrom(height) : undefined,
-    );
-    if (udtBalances.length === 0) {
+  ): Promise<RpcResponse<TokenBalance[]>> {
+    try {
+      assert(examineAddress(address), RpcError.InvalidAddress);
+      assert(tokenId ? examineTokenId(tokenId) : true, RpcError.InvalidTokenId);
+      const udtBalances = await this.service.getTokenBalanceByAddress(
+        address,
+        tokenId,
+        height ? ccc.numFrom(height) : undefined,
+      );
+      if (udtBalances.length === 0) {
+        return {
+          code: -1,
+          msg: "No token balances found",
+        };
+      }
       return {
-        code: -1,
-        msg: "No token balances found",
+        code: 0,
+        data: await asyncMap(
+          udtBalances,
+          this.udtBalanceToTokenBalance.bind(this),
+        ),
       };
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return {
+          code: -1,
+          msg: e.message,
+        };
+      }
+      throw e;
     }
-    return {
-      code: 0,
-      data: await asyncMap(
-        udtBalances,
-        this.udtBalanceToTokenBalance.bind(this),
-      ),
-    };
   }
 
   @ApiOkResponse({
@@ -156,35 +185,43 @@ export class UdtController {
     description:
       "Get detailed token balances under a token id, filtered by addresses",
   })
-  @ApiQuery({
-    name: "height",
-    required: false,
-    description: "The height of the block to query (optional)",
-  })
-  @Get("/tokens/balances/:tokenId/:addresses")
+  @Post("/tokens/balances")
   async batchGetTokenBalances(
-    @Param("tokenId") tokenId: string,
-    @Param("addresses") addresses: string,
-    @Query("height") height?: number,
-  ): Promise<NormalizedReturn<TokenBalance[]>> {
-    const udtBalances = await this.service.getTokenBalanceByTokenId(
-      tokenId,
-      addresses.split(","),
-      height ? ccc.numFrom(height) : undefined,
-    );
-    if (udtBalances.length === 0) {
+    @Body() dto: BatchGetTokenBalancesDto,
+  ): Promise<RpcResponse<TokenBalance[]>> {
+    try {
+      assert(examineTokenId(dto.tokenId), RpcError.InvalidTokenId);
+      assert(
+        dto.addresses.every((address) => examineAddress(address)),
+        RpcError.InvalidAddress,
+      );
+      const udtBalances = await this.service.getTokenBalanceByTokenId(
+        dto.tokenId,
+        dto.addresses,
+        dto.height ? ccc.numFrom(dto.height) : undefined,
+      );
+      if (udtBalances.length === 0) {
+        return {
+          code: -1,
+          msg: "No token balances found",
+        };
+      }
       return {
-        code: -1,
-        msg: "No token balances found",
+        code: 0,
+        data: await asyncMap(
+          udtBalances,
+          this.udtBalanceToTokenBalance.bind(this),
+        ),
       };
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return {
+          code: -1,
+          msg: e.message,
+        };
+      }
+      throw e;
     }
-    return {
-      code: 0,
-      data: await asyncMap(
-        udtBalances,
-        this.udtBalanceToTokenBalance.bind(this),
-      ),
-    };
   }
 
   @ApiOkResponse({
@@ -207,28 +244,39 @@ export class UdtController {
     @Param("tokenId") tokenId: string,
     @Query("offset") offset: number,
     @Query("limit") limit: number,
-  ): Promise<NormalizedReturn<TokenHolders>> {
-    const udtBalances = await this.service.getTokenAllBalances(
-      tokenId,
-      isNaN(offset) ? 0 : offset,
-      isNaN(limit) ? 10 : limit,
-    );
-    if (udtBalances.length === 0) {
+  ): Promise<RpcResponse<TokenHolders>> {
+    try {
+      assert(examineTokenId(tokenId), RpcError.InvalidTokenId);
+      const udtBalances = await this.service.getTokenAllBalances(
+        tokenId,
+        isNaN(offset) ? 0 : offset,
+        isNaN(limit) ? 10 : limit,
+      );
+      if (udtBalances.length === 0) {
+        return {
+          code: -1,
+          msg: "No token balances found",
+        };
+      }
+      const udtBalanceTotal = await this.service.getTokenHoldersCount(tokenId);
       return {
-        code: -1,
-        msg: "No token balances found",
+        code: 0,
+        data: {
+          total: udtBalanceTotal,
+          list: await asyncMap(
+            udtBalances,
+            this.udtBalanceToTokenBalance.bind(this),
+          ),
+        },
       };
+    } catch (e) {
+      if (e instanceof ApiError) {
+        return {
+          code: -1,
+          msg: e.message,
+        };
+      }
+      throw e;
     }
-    const udtBalanceTotal = await this.service.getTokenHoldersCount(tokenId);
-    return {
-      code: 0,
-      data: {
-        total: udtBalanceTotal,
-        list: await asyncMap(
-          udtBalances,
-          this.udtBalanceToTokenBalance.bind(this),
-        ),
-      },
-    };
   }
 }

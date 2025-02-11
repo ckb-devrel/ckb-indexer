@@ -1,9 +1,9 @@
 import {
   ApiError,
   assert,
-  NormalizedReturn,
   parseSortableInt,
   RpcError,
+  RpcResponse,
   TrackerInfo,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
@@ -24,7 +24,7 @@ export class SyncController {
     description: "Get current tracker running status quo",
   })
   @Get("/trackerInfo")
-  async getTrackerInfo(): Promise<NormalizedReturn<TrackerInfo>> {
+  async getTrackerInfo(): Promise<RpcResponse<TrackerInfo>> {
     try {
       const dbTip = assert(
         await this.service.getBlockHeader({

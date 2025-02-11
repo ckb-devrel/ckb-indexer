@@ -4,8 +4,8 @@ import {
   Chain,
   ClusterInfo,
   NFTInfo,
-  NormalizedReturn,
   RpcError,
+  RpcResponse,
 } from "@app/commons";
 import { ccc } from "@ckb-ccc/shell";
 import { Controller, Get, Param, Query } from "@nestjs/common";
@@ -32,7 +32,7 @@ export class SporeController {
   async getSporeClusterById(
     @Param("clusterId") clusterId: string,
     @Query("withDesc") withDesc?: boolean,
-  ): Promise<NormalizedReturn<ClusterInfo>> {
+  ): Promise<RpcResponse<ClusterInfo>> {
     try {
       const cluster = assert(
         await this.service.getCluster(clusterId),
@@ -86,7 +86,7 @@ export class SporeController {
   async getSporeById(
     @Param("sporeId") sporeId: string,
     @Query("withClusterDesc") withClusterDesc?: boolean,
-  ): Promise<NormalizedReturn<NFTInfo>> {
+  ): Promise<RpcResponse<NFTInfo>> {
     try {
       const spore = assert(
         await this.service.getSpore(sporeId),

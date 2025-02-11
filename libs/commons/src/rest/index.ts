@@ -37,7 +37,7 @@ export enum LeapType {
   ToUtxo = 2,
 }
 
-export class NormalizedReturn<T> {
+export class RpcResponse<T> {
   code: number;
   msg?: string;
   data?: T;
