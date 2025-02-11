@@ -7,8 +7,8 @@ import {
   extractIsomorphicInfo,
   IsomorphicBinding,
   LeapType,
-  NormalizedReturn,
   RpcError,
+  RpcResponse,
   ScriptMode,
   TxAssetCellData,
   TxAssetCellDetail,
@@ -331,7 +331,7 @@ export class AssetController {
   @Get("/assetCells/by-transaction/:txHash")
   async queryTxAssetCellDataByTxHash(
     @Param("txHash") txHash: string,
-  ): Promise<NormalizedReturn<TxAssetCellData>> {
+  ): Promise<RpcResponse<TxAssetCellData>> {
     try {
       const { tx, blockHash, blockNumber } = assert(
         await this.service.getTransactionWithBlockByTxHash(txHash),
@@ -359,7 +359,7 @@ export class AssetController {
   @Get("/assetCells/by-block/:blockHash")
   async queryTxAssetCellDataListByBlockHash(
     @Param("blockHash") blockHash: string,
-  ): Promise<NormalizedReturn<TxAssetCellData[]>> {
+  ): Promise<RpcResponse<TxAssetCellData[]>> {
     try {
       const block = assert(
         await this.service.getBlockByBlockHash(blockHash),

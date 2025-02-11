@@ -1,7 +1,9 @@
 import {
+  assert,
   assertConfig,
   headerToRepoBlock,
   parseScriptMode,
+  RpcError,
   ScriptMode,
 } from "@app/commons";
 import { Block, UdtBalance, UdtInfo } from "@app/schemas";
@@ -102,6 +104,13 @@ export class UdtService {
     tokenId?: ccc.HexLike,
     height?: ccc.Num,
   ): Promise<UdtBalance[]> {
+    if (height) {
+      assert(
+        await this.udtBalanceRepo.hasHeight(height),
+        RpcError.HeightCropped,
+      );
+    }
+
     return await this.udtBalanceRepo.getTokenItemsByAddress(
       [address],
       tokenId,
@@ -114,6 +123,13 @@ export class UdtService {
     addresses: string[],
     height?: ccc.Num,
   ): Promise<UdtBalance[]> {
+    if (height) {
+      assert(
+        await this.udtBalanceRepo.hasHeight(height),
+        RpcError.HeightCropped,
+      );
+    }
+
     return await this.udtBalanceRepo.getTokenItemsByAddress(
       addresses,
       tokenId,

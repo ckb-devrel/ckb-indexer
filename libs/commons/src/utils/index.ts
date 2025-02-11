@@ -1,8 +1,10 @@
 import { Block } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
+import { cccA } from "@ckb-ccc/shell/advanced";
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
+import { validate } from "bitcoin-address-validation";
 import { formatSortableInt } from "../ormUtils";
 import { ScriptMode } from "../rest";
 
@@ -68,6 +70,9 @@ export enum RpcError {
   ClusterNotFound,
   SporeNotFound,
   IsomorphicBindingNotFound,
+  HeightCropped,
+  InvalidAddress,
+  InvalidTokenId,
 }
 
 export const RpcErrorMessage: Record<RpcError, string> = {
@@ -80,6 +85,9 @@ export const RpcErrorMessage: Record<RpcError, string> = {
   [RpcError.ClusterNotFound]: "Cluster not found",
   [RpcError.SporeNotFound]: "Spore not found",
   [RpcError.IsomorphicBindingNotFound]: "Isomorphic binding not found",
+  [RpcError.HeightCropped]: "Record on height cropped",
+  [RpcError.InvalidAddress]: "Invalid address",
+  [RpcError.InvalidTokenId]: "Invalid token id",
 };
 
 export class ApiError {
@@ -87,6 +95,10 @@ export class ApiError {
 
   constructor(message: string) {
     this.message = message;
+  }
+
+  static fromRpcError(error: RpcError) {
+    return new ApiError(RpcErrorMessage[error]);
   }
 }
 
@@ -304,4 +316,20 @@ export function mintableScriptMode(scriptMode: ScriptMode): boolean {
     ScriptMode.RgbppDogeTimelock,
   ].includes(scriptMode);
   return !unmintable;
+}
+
+export function examineAddress(address: string): boolean {
+  if (address.startsWith("ck")) {
+    try {
+      cccA.addressPayloadFromString(address);
+      return true;
+    } catch (_) {}
+  } else {
+    return validate(address);
+  }
+  return false;
+}
+
+export function examineTokenId(tokenId: string): boolean {
+  return /^[0-9a-fA-F]{64}$/.test(tokenId);
 }

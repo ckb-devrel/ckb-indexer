@@ -10,6 +10,13 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     super(UdtBalance, manager);
   }
 
+  async hasHeight(height: ccc.Num): Promise<boolean> {
+    const count = await this.countBy({
+      updatedAtHeight: formatSortable(height),
+    });
+    return count > 0;
+  }
+
   async getTokenItemsByAddress(
     addresses: string[],
     tokenHash?: ccc.HexLike,
