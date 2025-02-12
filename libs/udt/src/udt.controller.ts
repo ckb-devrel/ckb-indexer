@@ -164,12 +164,6 @@ export class UdtController {
         tokenId,
         height ? ccc.numFrom(height) : undefined,
       );
-      if (udtBalances.length === 0) {
-        return {
-          code: -1,
-          msg: "No token balances found",
-        };
-      }
       return {
         code: 0,
         data: await asyncMap(
@@ -208,12 +202,6 @@ export class UdtController {
         dto.addresses,
         dto.height ? ccc.numFrom(dto.height) : undefined,
       );
-      if (udtBalances.length === 0) {
-        return {
-          code: -1,
-          msg: "No token balances found",
-        };
-      }
       return {
         code: 0,
         data: await asyncMap(
@@ -260,12 +248,6 @@ export class UdtController {
         isNaN(offset) ? 0 : offset,
         isNaN(limit) ? 10 : limit,
       );
-      if (udtBalances.length === 0) {
-        return {
-          code: -1,
-          msg: "No token balances found",
-        };
-      }
       const udtBalanceTotal = await this.service.getTokenHoldersCount(tokenId);
       return {
         code: 0,
