@@ -245,7 +245,7 @@ export async function parseBtcAddress(params: {
     logger?.debug(
       `[parseBtcAddress] Getting ${txId} from ${requester.getUri()}`,
     );
-    const { data } = await (async () => {
+    const { data, postError } = await (async () => {
       try {
         return await requester.post("/", {
           method: "getrawtransaction",
@@ -255,9 +255,19 @@ export async function parseBtcAddress(params: {
         if (err?.response?.data?.error !== undefined) {
           return err.response;
         }
-        throw err;
+        return {
+          postError: err,
+        };
       }
     })();
+
+    if (postError) {
+      logger?.error(
+        `[parseBtcAddress] Failed to get ${txId} from ${requester.getUri()}: ${postError}`,
+      );
+      error = postError;
+      continue;
+    }
 
     const rpcError = data?.error ? JSON.stringify(data?.error) : undefined;
     if (
