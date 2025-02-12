@@ -13,7 +13,7 @@ import {
   TokenHolders,
   TokenInfo,
 } from "@app/commons";
-import { UdtBalance } from "@app/schemas";
+import { UdtBalance, UdtInfo } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import {
@@ -49,13 +49,10 @@ class BatchGetTokenBalancesDto {
 export class UdtController {
   constructor(private readonly service: UdtService) {}
 
-  async udtBalanceToTokenBalance(
+  udtBalanceToTokenBalance(
     udtBalance: UdtBalance,
-  ): Promise<TokenBalance> {
-    const { udtInfo } = assert(
-      await this.service.getTokenInfo(udtBalance.tokenHash),
-      RpcError.TokenNotFound,
-    );
+    udtInfo: UdtInfo,
+  ): TokenBalance {
     return {
       tokenId: ccc.hexFrom(udtBalance.tokenHash),
       name: udtInfo.name ?? undefined,
@@ -164,12 +161,40 @@ export class UdtController {
         tokenId,
         height ? ccc.numFrom(height) : undefined,
       );
+      const data: TokenBalance[] = [];
+      const udtInfos: Record<string, UdtInfo> = {};
+      for (const udtBalance of udtBalances) {
+        let udtInfo = udtInfos[udtBalance.tokenHash];
+        if (udtInfo === undefined) {
+          const { udtInfo: newUdtInfo } = assert(
+            await this.service.getTokenInfo(udtBalance.tokenHash),
+            RpcError.TokenNotFound,
+          );
+          udtInfo = newUdtInfo;
+          udtInfos[udtBalance.tokenHash] = udtInfo;
+        }
+        const token = this.udtBalanceToTokenBalance(udtBalance, udtInfo);
+        data.push(token);
+      }
+      // Always response with 0 if tokenId is provided but no balance found
+      if (tokenId && data.length === 0) {
+        const { udtInfo } = assert(
+          await this.service.getTokenInfo(tokenId),
+          RpcError.TokenNotFound,
+        );
+        data.push({
+          tokenId: ccc.hexFrom(tokenId),
+          name: udtInfo.name ?? undefined,
+          symbol: udtInfo.symbol ?? undefined,
+          decimal: udtInfo.decimals ?? undefined,
+          address,
+          balance: 0n,
+          height: 0n,
+        });
+      }
       return {
         code: 0,
-        data: await asyncMap(
-          udtBalances,
-          this.udtBalanceToTokenBalance.bind(this),
-        ),
+        data,
       };
     } catch (e) {
       if (e instanceof ApiError) {
@@ -202,12 +227,30 @@ export class UdtController {
         dto.addresses,
         dto.height ? ccc.numFrom(dto.height) : undefined,
       );
+      const { udtInfo } = assert(
+        await this.service.getTokenInfo(dto.tokenId),
+        RpcError.TokenNotFound,
+      );
+      const tokens = udtBalances.map((value) =>
+        this.udtBalanceToTokenBalance(value, udtInfo),
+      );
+      // Mark missing addresses as 0 balance
+      dto.addresses.forEach((address) => {
+        if (!tokens.some((value) => value.address === address)) {
+          tokens.push({
+            tokenId: ccc.hexFrom(udtInfo.hash),
+            name: udtInfo.name ?? undefined,
+            symbol: udtInfo.symbol ?? undefined,
+            decimal: udtInfo.decimals ?? undefined,
+            address,
+            balance: 0n,
+            height: 0n,
+          });
+        }
+      });
       return {
         code: 0,
-        data: await asyncMap(
-          udtBalances,
-          this.udtBalanceToTokenBalance.bind(this),
-        ),
+        data: tokens,
       };
     } catch (e) {
       if (e instanceof ApiError) {
@@ -249,13 +292,16 @@ export class UdtController {
         isNaN(limit) ? 10 : limit,
       );
       const udtBalanceTotal = await this.service.getTokenHoldersCount(tokenId);
+      const { udtInfo } = assert(
+        await this.service.getTokenInfo(tokenId),
+        RpcError.TokenNotFound,
+      );
       return {
         code: 0,
         data: {
           total: udtBalanceTotal,
-          list: await asyncMap(
-            udtBalances,
-            this.udtBalanceToTokenBalance.bind(this),
+          list: udtBalances.map((value) =>
+            this.udtBalanceToTokenBalance(value, udtInfo),
           ),
         },
       };
