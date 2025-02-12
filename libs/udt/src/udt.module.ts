@@ -1,10 +1,21 @@
 import { Module } from "@nestjs/common";
-import { BlockRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import {
+  BlockRepo,
+  ScriptCodeRepo,
+  UdtBalanceRepo,
+  UdtInfoRepo,
+} from "./repos";
 import { UdtController } from "./udt.controller";
 import { UdtService } from "./udt.service";
 
 @Module({
-  providers: [UdtService, UdtInfoRepo, UdtBalanceRepo, BlockRepo],
+  providers: [
+    UdtService,
+    UdtInfoRepo,
+    UdtBalanceRepo,
+    BlockRepo,
+    ScriptCodeRepo,
+  ],
   exports: [UdtService],
   controllers: [UdtController],
 })
