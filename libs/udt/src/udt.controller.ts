@@ -16,7 +16,12 @@ import {
 import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
-import { ApiOkResponse, ApiProperty, ApiQuery } from "@nestjs/swagger";
+import {
+  ApiOkResponse,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiQuery,
+} from "@nestjs/swagger";
 import { UdtService } from "./udt.service";
 
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -27,12 +32,15 @@ class BatchGetTokenBalancesDto {
   @ApiProperty({ description: "Token ID" })
   tokenId: string;
 
-  @ApiProperty({ description: "Array of addresses" })
+  @ApiProperty({
+    isArray: true,
+    description: "Array of addresses",
+    type: String,
+  })
   addresses: string[];
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: "The height of the block to query",
-    required: false,
   })
   height?: number;
 }
