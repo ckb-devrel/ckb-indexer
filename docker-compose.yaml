@@ -12,6 +12,8 @@ services:
       - ssri
     networks:
       - networks
+    mem_limit: 4096m
+    mem_reservation: 2048m
 
   db:
     image: mysql:8
@@ -27,6 +29,8 @@ services:
     restart: always
     networks:
       - networks
+    mem_limit: 4096m
+    mem_reservation: 2048m
 
   decoder:
     image: hanssen0/ckb-dob-decoder-server
