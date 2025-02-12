@@ -239,13 +239,11 @@ export async function parseBtcAddress(params: {
   }
   const { outIndex, txId } = decoded;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let error: any | undefined = undefined;
   for (const requester of requesters) {
     logger?.debug(
       `[parseBtcAddress] Getting ${txId} from ${requester.getUri()}`,
     );
-    const { data, postError } = await (async () => {
+    const { data, skip } = await (async () => {
       try {
         return await requester.post("/", {
           method: "getrawtransaction",
@@ -255,30 +253,32 @@ export async function parseBtcAddress(params: {
         if (err?.response?.data?.error !== undefined) {
           return err.response;
         }
+        logger?.error(
+          `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${JSON.stringify(err)}`,
+        );
         return {
-          postError: err,
+          skip: true,
         };
       }
     })();
 
-    if (postError) {
-      error = `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${postError}`;
+    if (skip) {
       continue;
-    } else {
-      error = undefined;
     }
 
     const rpcError = data?.error ? JSON.stringify(data?.error) : undefined;
     if (
-      error !== undefined &&
+      rpcError !== undefined &&
       // From BTC core
-      !error?.includes("No such mempool or blockchain transaction.") &&
+      !rpcError?.includes("No such mempool or blockchain transaction.") &&
       // From Ankr's BTC rpc
-      !error?.includes(
+      !rpcError?.includes(
         "Retry failed, reason: Node responded with non success status code",
       )
     ) {
-      error = rpcError;
+      logger?.error(
+        `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${rpcError}`,
+      );
       continue;
     }
 
@@ -291,11 +291,9 @@ export async function parseBtcAddress(params: {
     return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
   }
 
-  if (error) {
-    throw error;
-  }
-
-  return ckbAddress;
+  throw new Error(
+    "Failed to get btc address from all of btc nodes, please change other nodes and try again.",
+  );
 }
 
 export function extractIsomorphicInfo(
