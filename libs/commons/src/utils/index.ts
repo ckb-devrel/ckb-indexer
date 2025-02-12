@@ -254,7 +254,7 @@ export async function parseBtcAddress(params: {
           return err.response;
         }
         logger?.error(
-          `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${JSON.stringify(err)}`,
+          `Failed to request ${txId}:${outIndex} from ${requester.getUri()}: ${err.message}`,
         );
         return {
           skip: true,
@@ -284,16 +284,14 @@ export async function parseBtcAddress(params: {
 
     if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
       logger?.warn(
-        `Failed to get btc rgbpp utxo ${txId}:${outIndex} from ${requester.getUri()}`,
+        `Failed to parse ${txId}:${outIndex} from ${requester.getUri()}: ${JSON.stringify(data)}`,
       );
       continue;
     }
     return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
   }
 
-  throw new Error(
-    "Failed to get btc address from all of btc nodes, please change other nodes and try again.",
-  );
+  throw new Error("Failed to get from all btc nodes, please try other nodes.");
 }
 
 export function extractIsomorphicInfo(

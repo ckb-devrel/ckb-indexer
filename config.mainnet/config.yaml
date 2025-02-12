@@ -91,5 +91,3 @@ sync:
       # username: username
       # password: password
     - uri: https://bitcoin.publicnode.com
-    - uri: https://btc.blockfrost.io/api/v0/
-    - uri: https://btc.public-rpc.com
