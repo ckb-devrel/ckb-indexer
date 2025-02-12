@@ -262,8 +262,10 @@ export async function parseBtcAddress(params: {
     })();
 
     if (postError) {
-      error = `Failed to get ${txId} from ${requester.getUri()}: ${postError}`;
+      error = `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${postError}`;
       continue;
+    } else {
+      error = undefined;
     }
 
     const rpcError = data?.error ? JSON.stringify(data?.error) : undefined;
