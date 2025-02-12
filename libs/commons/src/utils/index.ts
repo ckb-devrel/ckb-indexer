@@ -239,6 +239,7 @@ export async function parseBtcAddress(params: {
   }
   const { outIndex, txId } = decoded;
 
+  let fallbackToCkb = false;
   for (const requester of requesters) {
     logger?.debug(
       `[parseBtcAddress] Getting ${txId} from ${requester.getUri()}`,
@@ -267,28 +268,36 @@ export async function parseBtcAddress(params: {
     }
 
     const rpcError = data?.error ? JSON.stringify(data?.error) : undefined;
-    if (
-      rpcError !== undefined &&
-      // From BTC core
-      !rpcError?.includes("No such mempool or blockchain transaction.") &&
-      // From Ankr's BTC rpc
-      !rpcError?.includes(
-        "Retry failed, reason: Node responded with non success status code",
-      )
-    ) {
-      logger?.error(
-        `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${rpcError}`,
-      );
-      continue;
+    if (rpcError) {
+      // Which means the btc outpoint parsed from ckb has been dropped by btc nodes, so
+      // fallback to ckb address is fine
+      if (
+        rpcError?.includes("No such mempool or blockchain transaction.") ||
+        rpcError?.includes(
+          "Retry failed, reason: Node responded with non success status code",
+        )
+      ) {
+        fallbackToCkb = true;
+        break;
+      } else {
+        logger?.error(
+          `Failed to get ${txId}:${outIndex} from ${requester.getUri()}: ${rpcError}`,
+        );
+        continue;
+      }
     }
 
     if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
       logger?.warn(
-        `Failed to parse ${txId}:${outIndex} from ${requester.getUri()}: ${JSON.stringify(data)}`,
+        `Failed to parse address from ${txId}:${outIndex} from ${requester.getUri()}: ${JSON.stringify(data)}`,
       );
       continue;
     }
     return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
+  }
+
+  if (fallbackToCkb) {
+    return ckbAddress;
   }
 
   throw new Error("Failed to get from all btc nodes, please try other nodes.");
