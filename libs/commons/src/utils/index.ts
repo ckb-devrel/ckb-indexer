@@ -262,10 +262,7 @@ export async function parseBtcAddress(params: {
     })();
 
     if (postError) {
-      logger?.error(
-        `[parseBtcAddress] Failed to get ${txId} from ${requester.getUri()}: ${postError}`,
-      );
-      error = postError;
+      error = `Failed to get ${txId} from ${requester.getUri()}: ${postError}`;
       continue;
     }
 
