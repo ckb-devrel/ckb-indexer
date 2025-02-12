@@ -33,21 +33,51 @@ sync:
     # sUDT
     - codeHash: "0x5e7a36a77e68eecc013dfa2fe6a23f3b6c344b04005808694ae6dd45eea4cfd5"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0xc7813f6a415144643970c2e88e0bb6ca6a8edc5dd7c1022746f628284a9936d5"
+          index: 0
+        depType: "code"
     # xUDT
     - codeHash: "0x50bd8d6680b8b9cf98b73f3c08faf8b2a21914311954118ad6609be6e78a1b95"
       hashType: "data1"
+      cellDep:
+        outPoint:
+          txHash: "0xf6a5eef65101899db9709c8de1cc28f23c1bee90d857ebe176f6647ef109e20d"
+          index: 0
+        depType: "code"
     # xUDT Compatible 1
     - codeHash: "0x092c2c4a26ea475a8e860c29cf00502103add677705e2ccd8d6fe5af3caa5ae3"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0x3ceb520f240b168e0bddf0d89b4bcabbe7d4fa69751057cbe8e4f27239fad0e9"
+          index: 0
+        depType: "code"
     # xUDT Compatible 2
     - codeHash: "0x26a33e0815888a4a0614a0b7d09fa951e0993ff21e55905510104a0b1312032b"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0x8ec1081bd03e5417bb4467e96f4cec841acdd35924538a35e7547fe320118977"
+          index: 0
+        depType: "code"
     # xUDT Compatible 3
     - codeHash: "0x42a0b2aacc836c0fc2bbd421a9020de42b8411584190f30be547fdf54214acc3"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0x8dae0c83d77b7349f390d967b254e8329177b5c8c0e6da97c4a51efcca958ef5"
+          index: 4
+        depType: "code"
     # xUDT Compatible 4
     - codeHash: "0xbfa35a9c38a676682b65ade8f02be164d48632281477e36f8dc2f41f79e56bfc"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0xf6a5eef65101899db9709c8de1cc28f23c1bee90d857ebe176f6647ef109e20d"
+          index: 0
+        depType: "code"
 
   isMainnet: true
   maxConcurrent: 1024
@@ -60,3 +90,6 @@ sync:
     - uri: https://rpc.ankr.com/btc
       # username: username
       # password: password
+    - uri: https://bitcoin.publicnode.com
+    - uri: https://btc.blockfrost.io/api/v0/
+    - uri: https://btc.public-rpc.com

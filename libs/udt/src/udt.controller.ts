@@ -12,6 +12,8 @@ import {
   TokenBalance,
   TokenHolders,
   TokenInfo,
+  UdtCelldep,
+  UdtDepType,
 } from "@app/commons";
 import { UdtBalance, UdtInfo } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
@@ -64,6 +66,17 @@ export class UdtController {
     };
   }
 
+  celldepToUdtCelldep(celldep: ccc.CellDep): UdtCelldep {
+    return {
+      outPoint: {
+        txHash: ccc.hexFrom(celldep.outPoint.txHash),
+        index: celldep.outPoint.index,
+      },
+      depType:
+        celldep.depType === "code" ? UdtDepType.Code : UdtDepType.DepGroup,
+    };
+  }
+
   @ApiOkResponse({
     type: TokenInfo,
     description: "Get the information of a token by the tokenId",
@@ -104,6 +117,10 @@ export class UdtController {
           mode === ScriptMode.RgbppDoge ||
           mode === ScriptMode.SingleUseLock,
       );
+      const celldep = await this.service.getUdtCelldep(
+        udtInfo.typeCodeHash,
+        udtInfo.typeHashType,
+      );
       return {
         code: 0,
         data: {
@@ -119,6 +136,7 @@ export class UdtController {
           issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),
           issueTxHeight: parseSortableInt(issueBlock.height),
           issueTime: issueBlock.timestamp,
+          celldep: celldep ? this.celldepToUdtCelldep(celldep) : undefined,
         },
       };
     } catch (e) {

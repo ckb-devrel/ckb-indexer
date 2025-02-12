@@ -54,6 +54,25 @@ export class CellScript {
   codeHashType?: ScriptMode;
 }
 
+export enum UdtDepType {
+  Code = "code",
+  DepGroup = "depGroup",
+}
+
+export class UdtOutpoint {
+  @ApiProperty({ type: String })
+  txHash: ccc.Hex;
+  @ApiProperty({ type: Number })
+  index: ccc.Num;
+}
+
+export class UdtCelldep {
+  @ApiProperty({ type: UdtOutpoint })
+  outPoint: UdtOutpoint;
+  @ApiProperty({ enum: UdtDepType })
+  depType: UdtDepType;
+}
+
 export class TokenInfo {
   @ApiProperty({ type: String })
   tokenId: ccc.Hex;
@@ -79,6 +98,8 @@ export class TokenInfo {
   issueTxHeight: ccc.Num;
   @ApiProperty()
   issueTime: number;
+  @ApiPropertyOptional({ type: UdtCelldep })
+  celldep?: UdtCelldep;
 }
 
 export class TokenBalance {
