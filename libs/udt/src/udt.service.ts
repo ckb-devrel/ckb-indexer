@@ -12,18 +12,21 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
 import { BlockRepo } from "./repos/block.repo";
+import { ScriptCodeRepo } from "./repos/scriptCode.repo";
 
 @Injectable()
 export class UdtService {
   private readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
+  private readonly udtTypes: Record<ccc.Hex, ccc.CellDepLike>;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly udtInfoRepo: UdtInfoRepo,
     private readonly udtBalanceRepo: UdtBalanceRepo,
     private readonly blockRepo: BlockRepo,
+    private readonly scriptCodeRepo: ScriptCodeRepo,
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
     const ckbRpcUri = configService.get<string>("sync.ckbRpcUri");
@@ -37,6 +40,33 @@ export class UdtService {
     this.rgbppBtcHashType = ccc.hashTypeFrom(
       assertConfig(configService, "sync.rgbppBtcHashType"),
     );
+
+    const udtTypes =
+      configService.get<
+        {
+          codeHash: ccc.HexLike;
+          hashType: ccc.HashTypeLike;
+          cellDep: ccc.CellDepLike;
+        }[]
+      >("sync.udtTypes") ?? [];
+    this.udtTypes = udtTypes.reduce(
+      (acc, t) => {
+        acc[ccc.hexFrom(t.codeHash)] = t.cellDep;
+        return acc;
+      },
+      {} as Record<ccc.Hex, ccc.CellDepLike>,
+    );
+  }
+
+  async getUdtCelldep(
+    codeHash: ccc.HexLike,
+    hashType: ccc.HashTypeLike,
+  ): Promise<ccc.CellDep | undefined> {
+    const celldep = this.udtTypes[ccc.hexFrom(codeHash)];
+    if (!celldep) {
+      return await this.scriptCodeRepo.generateCelldep(codeHash, hashType);
+    }
+    return ccc.CellDep.from(celldep);
   }
 
   async getTokenInfo(

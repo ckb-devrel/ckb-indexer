@@ -1,9 +1,3 @@
-logger:
-  - fatal
-  - error
-  - warn
-  - log
-
 port: 8080
 
 mysql:
@@ -33,24 +27,59 @@ sync:
     # sUDT
     - codeHash: "0x48dbf59b4c7ee1547238021b4869bceedf4eea6b43772e5d66ef8865b6ae7212"
       hashType: "data"
+      cellDep:
+        outPoint:
+          txHash: "0xc1b2ae129fad7465aaa9acc9785f842ba3e6e8b8051d899defa89f5508a77958"
+          index: 0
+        depType: "code"
     # sUDT
     - codeHash: "0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0xe12877ebd2c3c364dc46c5c992bcfaf4fee33fa13eebdf82c591fc9825aab769"
+          index: 0
+        depType: "code"
     # xUDT
     - codeHash: "0x50bd8d6680b8b9cf98b73f3c08faf8b2a21914311954118ad6609be6e78a1b95"
       hashType: "data1"
+      cellDep:
+        outPoint:
+          txHash: "0x2267aca4b355d17683f4f74deb37b619c2038805dfd272afbdf63cb50175aa7b"
+          index: 0
+        depType: "code"
     # xUDT Compatible 1
     - codeHash: "0x98701eaf939113606a8a70013fd2e8f27b8f1e234acdc329f3d71f9e9d3d3233"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0x877c4c3c6f7159f29ea711f0cd21a54f93dcf950642c6a3a5abc9c070051372e"
+          index: 0
+        depType: "code"
     # xUDT Compatible 2
     - codeHash: "0x1142755a044bf2ee358cba9f2da187ce928c91cd4dc8692ded0337efa677d21a"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0xed7d65b9ad3d99657e37c4285d585fea8a5fcaf58165d54dacf90243f911548b"
+          index: 0
+        depType: "code"
     # xUDT Compatible 3
     - codeHash: "0xcc9dc33ef234e14bc788c43a4848556a5fb16401a04662fc55db9bb201987037"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0xaec423c2af7fe844b476333190096b10fc5726e6d9ac58a9b71f71ffac204fee"
+          index: 0
+        depType: "code"
     # xUDT(final_rls)
     - codeHash: "0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb"
       hashType: "type"
+      cellDep:
+        outPoint:
+          txHash: "0xbf6fb538763efec2a70a6a3dcb7242787087e1030c4e7d86585bc63a9d337f5f"
+          index: 0
+        depType: "code"
 
   isMainnet: false
   maxConcurrent: 1024
