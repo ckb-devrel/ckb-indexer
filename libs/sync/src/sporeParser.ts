@@ -185,14 +185,16 @@ class SporeParser {
             flow.asset.data,
           );
         } catch (err) {
-          this.context.logger.warn(`Invalid spore data id ${ccc.hexFrom(id)}`);
+          this.context.logger.warn(
+            `Invalid spore data id ${ccc.hexFrom(id)}: ${err}`,
+          );
         }
       } else {
         try {
           flow.asset.cluster = this.parseClusterData(flow.asset.data);
         } catch (err) {
           this.context.logger.warn(
-            `Invalid cluster data id ${ccc.hexFrom(id)}`,
+            `Invalid cluster data id ${ccc.hexFrom(id)}: ${err}`,
           );
         }
       }
