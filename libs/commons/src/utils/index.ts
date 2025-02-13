@@ -287,11 +287,13 @@ export async function parseBtcAddress(params: {
       }
     }
 
+    // Which means the btc tx pattern is not valid for rgbpp, so fallback to ckb address is fine
     if (data?.result?.vout?.[outIndex]?.scriptPubKey?.address == null) {
       logger?.warn(
         `Failed to parse address from ${txId}:${outIndex} from ${requester.getUri()}: ${JSON.stringify(data)}`,
       );
-      continue;
+      fallbackToCkb = true;
+      break;
     }
     return data?.result?.vout?.[outIndex]?.scriptPubKey?.address;
   }
