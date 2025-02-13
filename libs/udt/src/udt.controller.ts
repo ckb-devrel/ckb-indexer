@@ -207,7 +207,7 @@ export class UdtController {
           decimal: udtInfo.decimals ?? undefined,
           address,
           balance: 0n,
-          height: 0n,
+          height: await this.service.getTipBlockNumber(),
         });
       }
       return {
@@ -253,6 +253,7 @@ export class UdtController {
         this.udtBalanceToTokenBalance(value, udtInfo),
       );
       // Mark missing addresses as 0 balance
+      const tipBlockNumber = await this.service.getTipBlockNumber();
       dto.addresses.forEach((address) => {
         if (!tokens.some((value) => value.address === address)) {
           tokens.push({
@@ -262,7 +263,7 @@ export class UdtController {
             decimal: udtInfo.decimals ?? undefined,
             address,
             balance: 0n,
-            height: 0n,
+            height: tipBlockNumber,
           });
         }
       });
