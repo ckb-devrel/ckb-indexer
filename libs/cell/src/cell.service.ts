@@ -123,6 +123,7 @@ export class CellService {
   ): Promise<
     | {
         cell: ccc.Cell;
+        spent: boolean;
         spender?: ccc.OutPoint;
       }
     | undefined
@@ -130,15 +131,22 @@ export class CellService {
     const cell = await this.client.getCell({ txHash, index });
     if (cell) {
       // If the cell is not an asset, skip finding the spender
-      if (cell.cellOutput.type === undefined || !containSpender) {
+      if (cell.cellOutput.type === undefined) {
         return {
           cell,
+          spent: false,
         };
       }
       const liveCell = await this.client.getCellLive({ txHash, index }, true);
       if (liveCell) {
         return {
           cell: liveCell,
+          spent: false,
+        };
+      } else if (!containSpender) {
+        return {
+          cell,
+          spent: true,
         };
       }
       const cellTx = await this.client.getTransaction(cell.outPoint.txHash);
@@ -170,6 +178,7 @@ export class CellService {
         ) {
           return {
             cell,
+            spent: true,
             spender: ccc.OutPoint.from({
               txHash: tx.txHash,
               index: tx.cellIndex,
@@ -179,6 +188,7 @@ export class CellService {
       }
       return {
         cell,
+        spent: true,
       };
     }
   }
@@ -189,6 +199,7 @@ export class CellService {
   ): Promise<
     | {
         cell: ccc.Cell;
+        spent: boolean;
         spender?: ccc.OutPoint;
       }
     | undefined
@@ -204,7 +215,7 @@ export class CellService {
       true,
     );
     for await (const cell of rgbppCells) {
-      return { cell };
+      return { cell, spent: false };
     }
     const rgbppTxs = this.client.findTransactionsByLock(
       {
@@ -230,7 +241,7 @@ export class CellService {
         });
       }
     }
-    return spentCell ? { cell: spentCell, spender } : undefined;
+    return spentCell ? { cell: spentCell, spent: true, spender } : undefined;
   }
 
   // async getPagedTokenCells(

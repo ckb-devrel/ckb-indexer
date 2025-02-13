@@ -93,6 +93,7 @@ export class CellController {
 
   async cellToTokenCell(
     cell: ccc.Cell,
+    spent: boolean,
     spender?: ccc.OutPoint,
   ): Promise<TokenCell> {
     const address = await this.service.scriptToAddress(cell.cellOutput.lock);
@@ -118,7 +119,7 @@ export class CellController {
         typeScriptType === ScriptMode.Udt
           ? ccc.udtBalanceFrom(cell.outputData)
           : undefined,
-      spent: spender !== undefined,
+      spent,
       spenderTx: spender ? spender.txHash : undefined,
       inputIndex: spender ? Number(spender.index) : undefined,
       rgbppBinding: isomorphicBinding,
@@ -142,7 +143,7 @@ export class CellController {
     @Query("containSpender") containSpender?: boolean,
   ): Promise<RpcResponse<TokenCell>> {
     try {
-      const { cell, spender } = assert(
+      const { cell, spent, spender } = assert(
         await this.service.getCellByOutpoint(
           txHash,
           index,
@@ -153,7 +154,7 @@ export class CellController {
       assert(cell.cellOutput.type, RpcError.CellNotAsset);
       return {
         code: 0,
-        data: await this.cellToTokenCell(cell, spender),
+        data: await this.cellToTokenCell(cell, spent, spender),
       };
     } catch (e) {
       if (e instanceof ApiError) {
@@ -176,14 +177,14 @@ export class CellController {
     @Param("index") index: number,
   ): Promise<RpcResponse<TokenCell>> {
     try {
-      const { cell, spender } = assert(
+      const { cell, spent, spender } = assert(
         await this.service.getRgbppCellByUtxo(btcTxHash, index),
         RpcError.RgbppCellNotFound,
       );
       assert(cell.cellOutput.type, RpcError.CellNotAsset);
       return {
         code: 0,
-        data: await this.cellToTokenCell(cell, spender),
+        data: await this.cellToTokenCell(cell, spent, spender),
       };
     } catch (e) {
       if (e instanceof ApiError) {
@@ -229,7 +230,7 @@ export class CellController {
       code: 0,
       data: {
         cells: await asyncMap(cells, (cell) => {
-          return this.cellToTokenCell(cell);
+          return this.cellToTokenCell(cell, false);
         }),
         cursor: lastCursor,
       },
