@@ -3,6 +3,7 @@ import {
   assertConfig,
   headerToRepoBlock,
   parseScriptMode,
+  parseSortableInt,
   RpcError,
   ScriptMode,
 } from "@app/commons";
@@ -67,6 +68,11 @@ export class UdtService {
       return await this.scriptCodeRepo.generateCelldep(codeHash, hashType);
     }
     return ccc.CellDep.from(celldep);
+  }
+
+  async getTipBlockNumber(): Promise<ccc.Num> {
+    const tipBlock = await this.blockRepo.getTipBlock();
+    return tipBlock ? parseSortableInt(tipBlock.height) : 0n;
   }
 
   async getTokenInfo(

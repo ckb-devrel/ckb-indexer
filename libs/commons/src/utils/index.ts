@@ -347,5 +347,5 @@ export function examineAddress(address: string): boolean {
 }
 
 export function examineTokenId(tokenId: string): boolean {
-  return /^[0-9a-fA-F]{64}$/.test(tokenId);
+  return /^(0x)?[0-9a-fA-F]{64}$/.test(tokenId);
 }
