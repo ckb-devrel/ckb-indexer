@@ -91,7 +91,7 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     }
   }
 
-  async getTokenItemsByTokenId(
+  async getNonZeroTokenItemsByTokenId(
     tokenHash: ccc.HexLike,
     offset: number,
     limit: number,
@@ -102,7 +102,7 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
     //   WHERE ub.updatedAtHeight IN (
     //     SELECT MAX(ub_inner.updatedAtHeight)
     //     FROM udt_balance AS ub_inner
-    //     WHERE ub_inner.tokenHash = ? AND ub_inner.balance >= 0
+    //     WHERE ub_inner.tokenHash = ? AND ub_inner.balance > 0
     //     GROUP BY ub_inner.addressHash
     //   )
     //   LIMIT ? OFFSET ?;
@@ -119,7 +119,7 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           addressHash,
           MAX(updatedAtHeight) AS max_height
         FROM udt_balance
-        WHERE tokenHash = ? AND balance >= 0
+        WHERE tokenHash = ? AND balance > 0
         GROUP BY addressHash
         ORDER BY max_height DESC
         LIMIT ? OFFSET ?
