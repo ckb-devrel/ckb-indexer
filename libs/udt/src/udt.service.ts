@@ -178,7 +178,7 @@ export class UdtService {
     offset: number,
     limit: number,
   ): Promise<UdtBalance[]> {
-    return await this.udtBalanceRepo.getTokenItemsByTokenId(
+    return await this.udtBalanceRepo.getNonZeroTokenItemsByTokenId(
       tokenId,
       offset,
       limit,
