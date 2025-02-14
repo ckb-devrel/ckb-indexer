@@ -12,13 +12,6 @@ services:
       - ssri
     networks:
       - networks
-    mem_limit: 4096m
-    mem_reservation: 2048m
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   db:
     image: mysql:8
@@ -34,13 +27,6 @@ services:
     restart: always
     networks:
       - networks
-    mem_limit: 4096m
-    mem_reservation: 2048m
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   decoder:
     image: hanssen0/ckb-dob-decoder-server
@@ -49,11 +35,6 @@ services:
     restart: always
     networks:
       - networks
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   ssri:
     image: hanssen0/ckb-ssri-server
@@ -62,11 +43,6 @@ services:
     restart: always
     networks:
       - networks
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 networks:
   networks:
