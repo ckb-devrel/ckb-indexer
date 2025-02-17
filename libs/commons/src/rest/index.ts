@@ -335,3 +335,22 @@ export class TokenHolders {
   @ApiProperty({ type: TokenBalance, isArray: true })
   list: TokenBalance[];
 }
+
+export class CellSpendInfo {
+  @ApiProperty({ type: String })
+  txId: ccc.Hex;
+  @ApiProperty()
+  vout: ccc.Num;
+  @ApiProperty()
+  address: string;
+  @ApiProperty()
+  capacity: ccc.Num;
+  @ApiProperty()
+  spent: boolean;
+  @ApiPropertyOptional({ type: String })
+  spenderTx?: ccc.Hex;
+  @ApiPropertyOptional({ type: Number })
+  spenderIndex?: ccc.Num;
+  @ApiPropertyOptional({ type: Number })
+  spenderHeight?: ccc.Num;
+}

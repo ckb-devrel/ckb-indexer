@@ -166,30 +166,29 @@ export class AssetService {
       spender?: ccc.OutPointLike;
     }[]
   > {
-    const cells: ccc.Cell[] = [];
+    const promies: Promise<ccc.Cell | undefined>[] = [];
     for (const input of tx.inputs) {
-      const cell = await this.client.getCell(input.previousOutput);
-      if (cell) {
-        cells.push(cell);
-      }
+      const cell = this.client.getCell(input.previousOutput);
+      promies.push(cell);
     }
-    return cells.map((cell, index) => {
-      return {
-        cell,
-        spender: {
-          txHash: tx.hash(),
-          index,
-        },
-      };
-    });
+    const cells = await Promise.all(promies);
+    return cells
+      .filter((cell) => cell !== undefined)
+      .map((cell, index) => {
+        return {
+          cell,
+          spender: {
+            txHash: tx.hash(),
+            index,
+          },
+        };
+      });
   }
 
-  async extractCellsFromTxOutputs(tx: ccc.Transaction): Promise<
-    {
-      cell: ccc.Cell;
-      spenderTx?: ccc.Hex;
-    }[]
-  > {
+  extractCellsFromTxOutputs(tx: ccc.Transaction): {
+    cell: ccc.Cell;
+    spenderTx?: ccc.Hex;
+  }[] {
     const cells: ccc.Cell[] = [];
     for (const [index, output] of tx.outputs.entries()) {
       cells.push(
@@ -203,14 +202,12 @@ export class AssetService {
         }),
       );
     }
-    return await Promise.all(
-      cells.map(async (cell) => {
-        return {
-          cell,
-          spenderTx: undefined, //await this.checkCellConsumed(cell),
-        };
-      }),
-    );
+    return cells.map((cell) => {
+      return {
+        cell,
+        spenderTx: undefined, //await this.checkCellConsumed(cell),
+      };
+    });
   }
 
   async getTokenFromCell(cell: ccc.Cell): Promise<
