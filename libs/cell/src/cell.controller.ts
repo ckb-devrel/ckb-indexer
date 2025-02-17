@@ -2,6 +2,7 @@ import {
   ApiError,
   assert,
   asyncMap,
+  CellSpendInfo,
   Chain,
   extractIsomorphicInfo,
   IsomorphicBinding,
@@ -233,6 +234,34 @@ export class CellController {
           return this.cellToTokenCell(cell, false);
         }),
         cursor: lastCursor,
+      },
+    };
+  }
+
+  @ApiOkResponse({
+    type: CellSpendInfo,
+    description: "Get the spend info of a cell",
+  })
+  @Get("/cells/spend-info/:txHash/:index")
+  async getCellSpendInfo(
+    @Param("txHash") txHash: string,
+    @Param("index") index: number,
+  ): Promise<RpcResponse<CellSpendInfo>> {
+    const { cell, spent, spender, spenderHeight } = assert(
+      await this.service.getCellByOutpoint(txHash, index, true),
+      RpcError.CkbCellNotFound,
+    );
+    return {
+      code: 0,
+      data: {
+        txId: cell.outPoint.txHash,
+        vout: cell.outPoint.index,
+        address: await this.service.scriptToAddress(cell.cellOutput.lock),
+        capacity: ccc.numFrom(cell.cellOutput.capacity),
+        spent,
+        spenderTx: spender?.txHash,
+        spenderIndex: spender?.index,
+        spenderHeight,
       },
     };
   }

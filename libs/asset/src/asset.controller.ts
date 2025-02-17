@@ -183,7 +183,7 @@ export class AssetController {
     }
 
     // extract and parse outputs
-    const outputCells = await this.service.extractCellsFromTxOutputs(tx);
+    const outputCells = this.service.extractCellsFromTxOutputs(tx);
     for (const [index, output] of outputCells.entries()) {
       if (output.cell.cellOutput.type === undefined) {
         continue;

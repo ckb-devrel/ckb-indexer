@@ -45,8 +45,6 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
             tokenHash: ccc.hexFrom(tokenHash),
             balance: MoreThanOrEqual(formatSortable(0)),
           },
-          order: { updatedAtHeight: "DESC" },
-          take: 1,
         });
       }
     } else {

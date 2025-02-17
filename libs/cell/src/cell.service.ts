@@ -125,6 +125,7 @@ export class CellService {
         cell: ccc.Cell;
         spent: boolean;
         spender?: ccc.OutPoint;
+        spenderHeight?: ccc.Num;
       }
     | undefined
   > {
@@ -183,6 +184,7 @@ export class CellService {
               txHash: tx.txHash,
               index: tx.cellIndex,
             }),
+            spenderHeight: tx.blockNumber,
           };
         }
       }
