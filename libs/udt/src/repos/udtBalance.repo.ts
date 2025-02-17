@@ -57,7 +57,10 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           FROM LatestRecords
           WHERE rn = 1;
         `;
-        return await this.manager.query(rawSql, [tokenHash, addressHashes]);
+        return await this.manager.query(rawSql, [
+          addressHashes,
+          ccc.hexFrom(tokenHash),
+        ]);
       }
     } else {
       if (height) {
