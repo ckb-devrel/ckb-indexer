@@ -2,7 +2,7 @@ import { formatSortable } from "@app/commons";
 import { UdtBalance } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Injectable } from "@nestjs/common";
-import { EntityManager, In, MoreThanOrEqual, Repository } from "typeorm";
+import { EntityManager, In, Repository } from "typeorm";
 
 @Injectable()
 export class UdtBalanceRepo extends Repository<UdtBalance> {
@@ -34,7 +34,6 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           where: {
             addressHash: In(addressHashes),
             tokenHash: ccc.hexFrom(tokenHash),
-            balance: MoreThanOrEqual(formatSortable(0)),
             updatedAtHeight: formatSortable(height),
           },
         });
@@ -43,10 +42,7 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           WITH LatestRecords AS (
             SELECT addressHash, MAX(updatedAtHeight) as maxHeight
             FROM udt_balance
-            WHERE 
-              addressHash IN (?)
-              AND tokenHash = ? 
-              AND balance >= 0
+            WHERE addressHash IN (?) AND tokenHash = ?
             GROUP BY addressHash
           )
           SELECT ub.*
@@ -67,7 +63,6 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
         return await this.find({
           where: {
             addressHash: In(addressHashes),
-            balance: MoreThanOrEqual(formatSortable(0)),
             updatedAtHeight: formatSortable(height),
           },
         });
@@ -87,13 +82,11 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
             SELECT 
               *,
               ROW_NUMBER() OVER (
-                PARTITION BY tokenHash 
+                PARTITION BY addressHash
                 ORDER BY updatedAtHeight DESC
               ) AS rn
             FROM udt_balance
-            WHERE 
-              addressHash IN (?) 
-              AND balance >= 0
+            WHERE addressHash IN (?) 
           )
           SELECT *
           FROM LatestRecords
