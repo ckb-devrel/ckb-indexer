@@ -132,12 +132,12 @@ export class CellService {
     const cell = await this.client.getCell({ txHash, index });
     if (cell) {
       // If the cell is not an asset, skip finding the spender
-      if (cell.cellOutput.type === undefined) {
-        return {
-          cell,
-          spent: false,
-        };
-      }
+      // if (cell.cellOutput.type === undefined) {
+      //   return {
+      //     cell,
+      //     spent: false,
+      //   };
+      // }
       const liveCell = await this.client.getCellLive({ txHash, index }, true);
       if (liveCell) {
         return {
