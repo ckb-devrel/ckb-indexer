@@ -41,24 +41,24 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
       } else {
         const rawSql = `
           WITH LatestRecords AS (
-            SELECT 
-              *,
-              ROW_NUMBER() OVER (
-                PARTITION BY addressHash
-                ORDER BY updatedAtHeight DESC
-              ) AS rn
+            SELECT addressHash, MAX(updatedAtHeight) as maxHeight
             FROM udt_balance
             WHERE 
-              addressHash IN (?) 
-              AND tokenHash = ?
+              addressHash IN (?)
+              AND tokenHash = ? 
               AND balance >= 0
+            GROUP BY addressHash
           )
-          SELECT *
-          FROM LatestRecords
-          WHERE rn = 1;
+          SELECT ub.*
+          FROM udt_balance ub
+          INNER JOIN LatestRecords lr 
+            ON ub.addressHash = lr.addressHash 
+            AND ub.updatedAtHeight = lr.maxHeight
+          WHERE ub.tokenHash = ?;
         `;
         return await this.manager.query(rawSql, [
           addressHashes,
+          ccc.hexFrom(tokenHash),
           ccc.hexFrom(tokenHash),
         ]);
       }
