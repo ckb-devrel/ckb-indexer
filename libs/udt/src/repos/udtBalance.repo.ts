@@ -39,13 +39,25 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
           },
         });
       } else {
-        return await this.find({
-          where: {
-            addressHash: In(addressHashes),
-            tokenHash: ccc.hexFrom(tokenHash),
-            balance: MoreThanOrEqual(formatSortable(0)),
-          },
-        });
+        const rawSql = `
+          WITH LatestRecords AS (
+            SELECT 
+              *,
+              ROW_NUMBER() OVER (
+                PARTITION BY addressHash
+                ORDER BY updatedAtHeight DESC
+              ) AS rn
+            FROM udt_balance
+            WHERE 
+              addressHash IN (?) 
+              AND tokenHash = ?
+              AND balance >= 0
+          )
+          SELECT *
+          FROM LatestRecords
+          WHERE rn = 1;
+        `;
+        return await this.manager.query(rawSql, [tokenHash, addressHashes]);
       }
     } else {
       if (height) {
