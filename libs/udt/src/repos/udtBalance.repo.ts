@@ -117,12 +117,11 @@ export class UdtBalanceRepo extends Repository<UdtBalance> {
   async getItemCountByTokenHash(tokenHash: ccc.HexLike): Promise<number> {
     const rawSql = `
       WITH LatestBalances AS (
-        SELECT addressHash
+        SELECT addressHash, MAX(updatedAtHeight)
         FROM udt_balance
         WHERE tokenHash = ?
           AND balance > 0
         GROUP BY addressHash
-        HAVING updatedAtHeight = MAX(updatedAtHeight)
       )
       SELECT COUNT(*) AS holderCount
       FROM LatestBalances;
