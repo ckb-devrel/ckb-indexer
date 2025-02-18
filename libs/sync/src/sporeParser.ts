@@ -295,7 +295,7 @@ class SporeParser {
 
     if (transfer) {
       if (prevSpore && prevSpore.ownerAddress !== transfer.from) {
-        throw new Error(
+        this.context.logger.error(
           `Spore owner mismatch when transferring ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${transfer.from}, at tx ${txHash}`,
         );
       }
@@ -323,7 +323,7 @@ class SporeParser {
 
     if (burn) {
       if (prevSpore && prevSpore.ownerAddress !== burn.from) {
-        throw new Error(
+        this.context.logger.error(
           `Spore owner mismatch when burning ${sporeId}, expected: ${prevSpore.ownerAddress}, actual: ${burn.from}, at tx ${txHash}`,
         );
       }
@@ -385,7 +385,7 @@ class SporeParser {
 
     if (transfer) {
       if (prevCluster && prevCluster.ownerAddress !== transfer.from) {
-        throw new Error(
+        this.context.logger.error(
           `Cluster owner mismatch when transferring: ${clusterId}, expected: ${prevCluster.ownerAddress}, actual: ${transfer.from}`,
         );
       }
