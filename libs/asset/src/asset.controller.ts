@@ -22,6 +22,11 @@ import { AssetService } from "./asset.service";
   return this.toString();
 };
 
+interface InputCell {
+  cell: ccc.Cell;
+  spender?: ccc.OutPointLike;
+}
+
 @Controller()
 export class AssetController {
   constructor(private readonly service: AssetService) {}
@@ -120,6 +125,7 @@ export class AssetController {
 
   async extractTxAssetFromTx(
     tx: ccc.Transaction,
+    inputCells: InputCell[],
     blockHash?: ccc.Hex,
     blockHeight?: ccc.Num,
   ): Promise<TxAssetCellData> {
@@ -147,7 +153,6 @@ export class AssetController {
     > = {};
 
     // extract and parse inputs
-    const inputCells = await this.service.extractCellsFromTxInputs(tx);
     for (const [index, input] of inputCells.entries()) {
       if (input.cell.cellOutput.type === undefined) {
         continue;
@@ -337,9 +342,15 @@ export class AssetController {
         await this.service.getTransactionWithBlockByTxHash(txHash),
         RpcError.TxNotFound,
       );
+      const inputCells = await this.service.extractCellsFromTxInputs(tx);
       return {
         code: 0,
-        data: await this.extractTxAssetFromTx(tx, blockHash, blockNumber),
+        data: await this.extractTxAssetFromTx(
+          tx,
+          inputCells,
+          blockHash,
+          blockNumber,
+        ),
       };
     } catch (e) {
       if (e instanceof ApiError) {
@@ -367,8 +378,10 @@ export class AssetController {
       );
       const txAssetCellDataList: TxAssetCellData[] = [];
       await asyncMap(block.transactions, async (tx) => {
+        const inputCells = await this.service.extractCellsFromTxInputs(tx);
         const txAssetCellData = await this.extractTxAssetFromTx(
           tx,
+          inputCells,
           block.header.hash,
           block.header.number,
         );

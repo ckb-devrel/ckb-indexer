@@ -11,6 +11,7 @@ import { cccA } from "@ckb-ccc/shell/advanced";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
+import { Worker } from "worker_threads";
 import { ClusterRepo, SporeRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
@@ -166,23 +167,37 @@ export class AssetService {
       spender?: ccc.OutPointLike;
     }[]
   > {
-    const promies: Promise<ccc.Cell | undefined>[] = [];
-    for (const input of tx.inputs) {
-      const cell = this.client.getCell(input.previousOutput);
-      promies.push(cell);
-    }
-    const cells = await Promise.all(promies);
-    return cells
-      .filter((cell) => cell !== undefined)
-      .map((cell, index) => {
-        return {
+    const worker = new Worker("./dist/workers/getOutpoint.js", {
+      workerData: {
+        isMainnet: this.configService.get<boolean>("sync.isMainnet"),
+        rpcUri: this.configService.get<string>("sync.ckbRpcUri"),
+        rpcTimeout: this.configService.get<number>("sync.ckbRpcTimeout"),
+        maxConcurrent: this.configService.get<number>("sync.maxConcurrent"),
+      },
+    });
+
+    try {
+      const cells: (ccc.Cell | undefined)[] = await new Promise(
+        (resolve, reject) => {
+          worker.postMessage(tx.inputs.map((input) => input.previousOutput));
+
+          worker.once("message", resolve);
+          worker.once("error", reject);
+        },
+      );
+
+      return cells
+        .filter((cell): cell is ccc.Cell => cell !== undefined)
+        .map((cell, index) => ({
           cell,
           spender: {
             txHash: tx.hash(),
             index,
           },
-        };
-      });
+        }));
+    } finally {
+      worker.terminate();
+    }
   }
 
   extractCellsFromTxOutputs(tx: ccc.Transaction): {
