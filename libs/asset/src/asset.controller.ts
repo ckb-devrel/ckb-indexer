@@ -35,13 +35,13 @@ export class AssetController {
     cell: ccc.Cell,
     index: number,
     eventType: EventType,
+    lockMode: ScriptMode,
+    typeMode: ScriptMode,
   ): Promise<TxAssetCellDetail> {
-    const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
-    const scriptMode = await this.service.scriptMode(cell.cellOutput.lock);
     const isomorphicInfo = extractIsomorphicInfo(cell.cellOutput.lock);
     let isomorphicBinding: IsomorphicBinding | undefined = undefined;
     if (isomorphicInfo) {
-      switch (scriptMode) {
+      switch (lockMode) {
         case ScriptMode.RgbppBtc:
           {
             isomorphicBinding = {
@@ -67,7 +67,7 @@ export class AssetController {
       capacity: cell.cellOutput.capacity,
       eventType,
       address: await this.service.scriptToAddress(cell.cellOutput.lock),
-      typeCodeName: await this.service.scriptMode(typeScript),
+      typeCodeName: typeMode,
       rgbppBinding: isomorphicBinding,
     };
     return cellAsset;
@@ -78,13 +78,19 @@ export class AssetController {
     index: number,
     eventType: EventType,
   ): Promise<TxAssetCellDetail> {
+    const typeScript = assert(cell.cellOutput.type, RpcError.CellNotAsset);
+    const lockMode = await this.service.scriptMode(cell.cellOutput.lock);
+    const typeMode = await this.service.scriptMode(typeScript);
+
     const cellAsset = await this.cellDetailWithoutAssets(
       cell,
       index,
       eventType,
+      lockMode,
+      typeMode,
     );
 
-    const token = await this.service.getTokenFromCell(cell);
+    const token = await this.service.getTokenFromCell(cell, lockMode, typeMode);
     if (token) {
       const { tokenInfo, balance, mintable } = token;
       cellAsset.tokenData = {
@@ -97,7 +103,7 @@ export class AssetController {
       };
     }
 
-    const cluster = await this.service.getClusterInfoFromCell(cell);
+    const cluster = await this.service.getClusterInfoFromCell(cell, typeMode);
     if (cluster) {
       cellAsset.nftData = {
         clusterId: ccc.hexFrom(cluster.clusterId),
@@ -110,7 +116,7 @@ export class AssetController {
       }
     }
 
-    const spore = await this.service.getSporeFromCell(cell);
+    const spore = await this.service.getSporeFromCell(cell, typeMode);
     if (spore) {
       cellAsset.nftData = {
         tokenId: ccc.hexFrom(spore.sporeId),
@@ -119,7 +125,6 @@ export class AssetController {
         contentType: spore.contentType,
       };
     }
-
     return cellAsset;
   }
 
