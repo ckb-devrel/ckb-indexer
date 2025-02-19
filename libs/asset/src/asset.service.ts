@@ -27,6 +27,7 @@ export class AssetService {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
   }[];
+  private readonly workers: Worker[];
 
   constructor(
     private readonly configService: ConfigService,
@@ -59,6 +60,19 @@ export class AssetService {
         { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
       >("sync.udtTypes") ?? [];
     this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
+
+    this.workers = Array.from(
+      new Array(10),
+      () =>
+        new Worker("./dist/workers/getOutpoint.js", {
+          workerData: {
+            isMainnet: this.configService.get<boolean>("sync.isMainnet"),
+            rpcUri: this.configService.get<string>("sync.ckbRpcUri"),
+            rpcTimeout: this.configService.get<number>("sync.ckbRpcTimeout"),
+            maxConcurrent: this.configService.get<number>("sync.maxConcurrent"),
+          },
+        }),
+    );
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
@@ -167,37 +181,42 @@ export class AssetService {
       spender?: ccc.OutPointLike;
     }[]
   > {
-    const worker = new Worker("./dist/workers/getOutpoint.js", {
-      workerData: {
-        isMainnet: this.configService.get<boolean>("sync.isMainnet"),
-        rpcUri: this.configService.get<string>("sync.ckbRpcUri"),
-        rpcTimeout: this.configService.get<number>("sync.ckbRpcTimeout"),
-        maxConcurrent: this.configService.get<number>("sync.maxConcurrent"),
-      },
-    });
-
-    try {
-      const cells: (ccc.Cell | undefined)[] = await new Promise(
-        (resolve, reject) => {
-          worker.postMessage(tx.inputs.map((input) => input.previousOutput));
-
-          worker.once("message", resolve);
-          worker.once("error", reject);
-        },
+    let cells: ccc.Cell[] = [];
+    if (tx.inputs.length < 20) {
+      const promises = tx.inputs.map((input) =>
+        this.client.getCell(input.previousOutput),
       );
-
-      return cells
-        .filter((cell): cell is ccc.Cell => cell !== undefined)
-        .map((cell, index) => ({
-          cell,
-          spender: {
-            txHash: tx.hash(),
-            index,
+      cells = (await Promise.all(promises)).filter(
+        (cell): cell is ccc.Cell => cell !== undefined,
+      );
+    } else {
+      const worker = this.workers.shift();
+      if (worker) {
+        const pureCells = await new Promise<ccc.CellLike[]>(
+          (resolve, reject) => {
+            worker.postMessage(tx.inputs.map((input) => input.previousOutput));
+            worker.once("message", resolve);
+            worker.once("error", reject);
           },
-        }));
-    } finally {
-      worker.terminate();
+        );
+        cells = pureCells.map((cell) => ccc.Cell.from(cell));
+      } else {
+        for (const input of tx.inputs) {
+          const cell = await this.client.getCell(input.previousOutput);
+          if (cell) {
+            cells.push(cell);
+          }
+        }
+      }
     }
+
+    return cells.map((cell, index) => ({
+      cell,
+      spender: {
+        txHash: tx.hash(),
+        index,
+      },
+    }));
   }
 
   extractCellsFromTxOutputs(tx: ccc.Transaction): {
@@ -225,7 +244,11 @@ export class AssetService {
     });
   }
 
-  async getTokenFromCell(cell: ccc.Cell): Promise<
+  async getTokenFromCell(
+    cell: ccc.Cell,
+    lockMode: ScriptMode,
+    typeMode: ScriptMode,
+  ): Promise<
     | {
         tokenInfo: UdtInfo;
         mintable: boolean;
@@ -233,11 +256,7 @@ export class AssetService {
       }
     | undefined
   > {
-    if (!cell.cellOutput.type) {
-      return;
-    }
-    const mode = await this.scriptMode(cell.cellOutput.type);
-    if (mode !== ScriptMode.Udt) {
+    if (typeMode !== ScriptMode.Udt || !cell.cellOutput.type) {
       return;
     }
     const tokenHash = cell.cellOutput.type.hash();
@@ -249,8 +268,8 @@ export class AssetService {
         typeHashType: cell.cellOutput.type.hashType,
         typeArgs: cell.cellOutput.type.args,
       });
-    const tokenAmount = ccc.udtBalanceFrom(cell.outputData);
-    const lockMode = await this.scriptMode(cell.cellOutput.lock);
+    const tokenAmount =
+      cell.outputData.length >= 16 ? ccc.udtBalanceFrom(cell.outputData) : 0n;
     return {
       tokenInfo,
       mintable: mintableScriptMode(lockMode),
@@ -300,16 +319,14 @@ export class AssetService {
       outputData.slice(3 + nameLen, 3 + nameLen + symbolLen),
       "utf8",
     );
-
     return udtInfo;
   }
 
-  async getClusterInfoFromCell(cell: ccc.Cell): Promise<Cluster | undefined> {
-    if (!cell.cellOutput.type) {
-      return;
-    }
-    const mode = await this.scriptMode(cell.cellOutput.type);
-    if (mode !== ScriptMode.Cluster) {
+  async getClusterInfoFromCell(
+    cell: ccc.Cell,
+    typeMode: ScriptMode,
+  ): Promise<Cluster | undefined> {
+    if (typeMode !== ScriptMode.Cluster || !cell.cellOutput.type) {
       return;
     }
     const clusterId = cell.cellOutput.type.args;
@@ -322,12 +339,11 @@ export class AssetService {
     );
   }
 
-  async getSporeFromCell(cell: ccc.Cell): Promise<Spore | undefined> {
-    if (!cell.cellOutput.type) {
-      return;
-    }
-    const mode = await this.scriptMode(cell.cellOutput.type);
-    if (mode !== ScriptMode.Spore) {
+  async getSporeFromCell(
+    cell: ccc.Cell,
+    typeMode: ScriptMode,
+  ): Promise<Spore | undefined> {
+    if (typeMode !== ScriptMode.Spore || !cell.cellOutput.type) {
       return;
     }
     const sporeId = cell.cellOutput.type.args;
