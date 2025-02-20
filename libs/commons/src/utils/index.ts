@@ -139,6 +139,7 @@ export function headerToRepoBlock(
   block.hash = header.hash;
   block.height = formatSortableInt(header.number);
   block.parentHash = header.parentHash;
+  block.timestamp = Number(header.timestamp);
   return block;
 }
 
