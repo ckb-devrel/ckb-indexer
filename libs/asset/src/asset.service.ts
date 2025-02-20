@@ -11,7 +11,6 @@ import { cccA } from "@ckb-ccc/shell/advanced";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
-import { Worker } from "worker_threads";
 import { ClusterRepo, SporeRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
@@ -27,7 +26,6 @@ export class AssetService {
     codeHash: ccc.HexLike;
     hashType: ccc.HashTypeLike;
   }[];
-  private readonly workers: Worker[];
 
   constructor(
     private readonly configService: ConfigService,
@@ -60,19 +58,6 @@ export class AssetService {
         { codeHash: ccc.HexLike; hashType: ccc.HashTypeLike }[]
       >("sync.udtTypes") ?? [];
     this.udtTypes = udtTypes.map((t) => ccc.Script.from({ ...t, args: "" }));
-
-    this.workers = Array.from(
-      new Array(10),
-      () =>
-        new Worker("./dist/workers/getOutpoint.js", {
-          workerData: {
-            isMainnet: this.configService.get<boolean>("sync.isMainnet"),
-            rpcUri: this.configService.get<string>("sync.ckbRpcUri"),
-            rpcTimeout: this.configService.get<number>("sync.ckbRpcTimeout"),
-            maxConcurrent: this.configService.get<number>("sync.maxConcurrent"),
-          },
-        }),
-    );
   }
 
   async scriptMode(script: ccc.ScriptLike): Promise<ScriptMode> {
@@ -181,34 +166,12 @@ export class AssetService {
       spender?: ccc.OutPointLike;
     }[]
   > {
-    let cells: ccc.Cell[] = [];
-    if (tx.inputs.length < 20) {
-      const promises = tx.inputs.map((input) =>
-        this.client.getCell(input.previousOutput),
-      );
-      cells = (await Promise.all(promises)).filter(
-        (cell): cell is ccc.Cell => cell !== undefined,
-      );
-    } else {
-      const worker = this.workers.shift();
-      if (worker) {
-        const pureCells = await new Promise<ccc.CellLike[]>(
-          (resolve, reject) => {
-            worker.postMessage(tx.inputs.map((input) => input.previousOutput));
-            worker.once("message", resolve);
-            worker.once("error", reject);
-          },
-        );
-        cells = pureCells.map((cell) => ccc.Cell.from(cell));
-      } else {
-        for (const input of tx.inputs) {
-          const cell = await this.client.getCell(input.previousOutput);
-          if (cell) {
-            cells.push(cell);
-          }
-        }
-      }
-    }
+    const promises = tx.inputs.map((input) =>
+      this.client.getCell(input.previousOutput),
+    );
+    const cells = (await Promise.all(promises)).filter(
+      (cell) => cell !== undefined,
+    );
 
     return cells.map((cell, index) => ({
       cell,
