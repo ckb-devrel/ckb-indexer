@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import {
   ScriptCodeRepo,
   SyncStatusRepo,
+  TransactionRepo,
   UdtBalanceRepo,
   UdtInfoRepo,
 } from "./repos";
@@ -25,6 +26,7 @@ import { UdtParser } from "./udtParser";
     UdtInfoRepo,
     SporeRepo,
     ClusterRepo,
+    TransactionRepo,
   ],
   exports: [SyncService, UdtParser, SporeParserBuilder],
   controllers: [SyncController],

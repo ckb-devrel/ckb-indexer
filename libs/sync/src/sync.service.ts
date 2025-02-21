@@ -21,6 +21,7 @@ import {
 import {
   ScriptCodeRepo,
   SyncStatusRepo,
+  TransactionRepo,
   UdtBalanceRepo,
   UdtInfoRepo,
 } from "./repos";
@@ -160,6 +161,7 @@ export class SyncService {
     private readonly clusterRepo: ClusterRepo,
     private readonly blockRepo: BlockRepo,
     private readonly scriptCodeRepo: ScriptCodeRepo,
+    private readonly transactionRepo: TransactionRepo,
   ) {
     this.isMainnet = configService.get<boolean>("sync.isMainnet");
     this.ssriServerUri = assertConfig<string>(
@@ -302,6 +304,7 @@ export class SyncService {
               const sporeRepo = new SporeRepo(entityManager);
               const udtInfoRepo = new UdtInfoRepo(entityManager);
               const udtBalanceRepo = new UdtBalanceRepo(entityManager);
+              const transactionRepo = new TransactionRepo(entityManager);
 
               await Promise.all([
                 clusterRepo.delete({
@@ -316,12 +319,29 @@ export class SyncService {
                 udtBalanceRepo.delete({
                   updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
                 }),
+                transactionRepo.delete({
+                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
+                }),
               ]);
               /* === Rollback records === */
             },
           );
           return;
         }
+
+        /* === Save block transactions === */
+        await Promise.all(
+          block.transactions.map((tx, index) =>
+            this.transactionRepo.save({
+              txHash: ccc.hexFrom(tx.hash()),
+              blockHash: block.header.hash,
+              txIndex: index,
+              tx: ccc.hexFrom(tx.toBytes()),
+              updatedAtHeight: formatSortableInt(height),
+            }),
+          ),
+        );
+        /* === Save block transactions === */
 
         txsCount += block.transactions.length;
         await Promise.all(
@@ -349,6 +369,23 @@ export class SyncService {
         const txDiffs = await Promise.all(
           block.transactions.map(async (txLike) => {
             const tx = ccc.Transaction.from(txLike);
+
+            // Complete extra infos for inputs, read from db at first, otherwise fetch from rpc
+            for (const input of tx.inputs) {
+              const txHash = ccc.hexFrom(input.previousOutput.txHash);
+              const index = Number(input.previousOutput.index);
+              const prevTx = await this.transactionRepo.findOne({
+                where: { txHash },
+              });
+              if (prevTx) {
+                const prevTxObj = ccc.Transaction.fromBytes(prevTx.tx);
+                input.cellOutput = prevTxObj.outputs[index];
+                input.outputData = prevTxObj.outputsData[index];
+              } else {
+                await input.completeExtraInfos(this.client);
+              }
+            }
+
             const diffs = await this.udtParser.udtInfoHandleTx(tx);
             const flows = await sporeParser.analyzeTxFlow(tx);
             return { tx, diffs, flows };
@@ -603,8 +640,47 @@ export class SyncService {
       );
     }
 
+    let deleteTransactionCount = 0;
+    while (true) {
+      const transaction = await this.transactionRepo.findOne({
+        where: {
+          updatedAtHeight: And(
+            LessThanOrEqual(formatSortableInt(confirmedHeight)),
+            MoreThan(formatSortableInt("-1")),
+          ),
+        },
+        order: {
+          updatedAtHeight: "DESC",
+        },
+      });
+      if (!transaction) {
+        // No more confirmed data
+        break;
+      }
+
+      await withTransaction(
+        this.entityManager,
+        undefined,
+        async (entityManager) => {
+          const transactionRepo = new TransactionRepo(entityManager);
+
+          // Delete all history data, and set the latest confirmed data as permanent data
+          const deleted = await transactionRepo.delete({
+            txHash: transaction.txHash,
+            updatedAtHeight: LessThan(transaction.updatedAtHeight),
+          });
+          deleteTransactionCount += deleted.affected ?? 0;
+
+          await transactionRepo.update(
+            { id: transaction.id },
+            { updatedAtHeight: formatSortableInt("-1") },
+          );
+        },
+      );
+    }
+
     this.logger.log(
-      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster`,
+      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster, ${deleteTransactionCount} confirmed Transaction`,
     );
   }
 
