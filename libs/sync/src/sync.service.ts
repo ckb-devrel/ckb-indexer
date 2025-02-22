@@ -372,7 +372,7 @@ export class SyncService {
             const tx = ccc.Transaction.from(txLike);
 
             // Complete extra infos for inputs, read from db at first, otherwise fetch from rpc
-            for (const input of tx.inputs) {
+            for (const [i, input] of tx.inputs.entries()) {
               const txHash = ccc.hexFrom(input.previousOutput.txHash);
               const index = Number(input.previousOutput.index);
               const prevTx = await this.transactionRepo.findOne({
@@ -385,6 +385,7 @@ export class SyncService {
               } else {
                 await input.completeExtraInfos(this.client);
               }
+              tx.inputs[i] = input;
             }
 
             const diffs = await this.udtParser.udtInfoHandleTx(tx);
