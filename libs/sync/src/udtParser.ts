@@ -169,9 +169,9 @@ export class UdtParser {
             // Otherwise falling back to tx.Witnesses (xUDT specific)
             if (!udtOwner) {
               for (const witness of tx.witnesses) {
-                try {
-                  const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
-                  if (witnessArgs.inputType) {
+                const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
+                if (witnessArgs.inputType) {
+                  try {
                     const xudtWitness = XudtWitness.decode(
                       witnessArgs.inputType,
                     );
@@ -181,8 +181,10 @@ export class UdtParser {
                       );
                       break;
                     }
-                  }
-                  if (witnessArgs.outputType) {
+                  } catch (_) {}
+                }
+                if (witnessArgs.outputType) {
+                  try {
                     const xudtWitness = XudtWitness.decode(
                       witnessArgs.outputType,
                     );
@@ -192,15 +194,17 @@ export class UdtParser {
                       );
                       break;
                     }
-                  }
-                } catch (_) {}
+                  } catch (_) {}
+                }
               }
             }
 
-            // Uncompatible xUDT specification
-            this.logger.error(
-              `Uncompatible xUDT specification for token ${tokenHash}`,
-            );
+            if (!udtOwner) {
+              // Uncompatible xUDT specification
+              this.logger.error(
+                `Uncompatible xUDT specification for token ${tokenHash}`,
+              );
+            }
           }
 
           const udtInfo = udtInfoRepo.create({

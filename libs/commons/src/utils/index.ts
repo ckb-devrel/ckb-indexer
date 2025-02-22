@@ -132,6 +132,7 @@ export const RgbppLockArgs = ccc.mol.struct({
 export const ScriptVecOpt = ccc.mol.option(ccc.mol.vector(ccc.Script));
 export const ScriptOpt = ccc.mol.option(ccc.Script);
 
+// Refer to https://github.com/nervosnetwork/ckb-production-scripts/blob/master/c/xudt_rce.mol#L6
 export const XudtWitness = ccc.mol.table({
   owner_script: ScriptOpt,
   owner_signature: ccc.mol.BytesOpt,
