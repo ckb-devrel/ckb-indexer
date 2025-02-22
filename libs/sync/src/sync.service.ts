@@ -331,15 +331,16 @@ export class SyncService {
 
         /* === Save block transactions === */
         await Promise.all(
-          block.transactions.map((tx, index) =>
-            this.transactionRepo.save({
-              txHash: ccc.hexFrom(tx.hash()),
+          block.transactions.map((tx, index) => {
+            const cccTx = ccc.Transaction.from(tx);
+            return this.transactionRepo.create({
+              txHash: ccc.hexFrom(cccTx.hash()),
               blockHash: block.header.hash,
               txIndex: index,
-              tx: ccc.hexFrom(tx.toBytes()),
+              tx: ccc.hexFrom(cccTx.toBytes()),
               updatedAtHeight: formatSortableInt(height),
-            }),
-          ),
+            });
+          }),
         );
         /* === Save block transactions === */
 
@@ -640,47 +641,49 @@ export class SyncService {
       );
     }
 
-    let deleteTransactionCount = 0;
-    while (true) {
-      const transaction = await this.transactionRepo.findOne({
-        where: {
-          updatedAtHeight: And(
-            LessThanOrEqual(formatSortableInt(confirmedHeight)),
-            MoreThan(formatSortableInt("-1")),
-          ),
-        },
-        order: {
-          updatedAtHeight: "DESC",
-        },
-      });
-      if (!transaction) {
-        // No more confirmed data
-        break;
-      }
+    // notice: donot delete transactions, saving all of them for query operations from RPCs
+    //
+    // let deleteTransactionCount = 0;
+    // while (true) {
+    //   const transaction = await this.transactionRepo.findOne({
+    //     where: {
+    //       updatedAtHeight: And(
+    //         LessThanOrEqual(formatSortableInt(confirmedHeight)),
+    //         MoreThan(formatSortableInt("-1")),
+    //       ),
+    //     },
+    //     order: {
+    //       updatedAtHeight: "DESC",
+    //     },
+    //   });
+    //   if (!transaction) {
+    //     // No more confirmed data
+    //     break;
+    //   }
 
-      await withTransaction(
-        this.entityManager,
-        undefined,
-        async (entityManager) => {
-          const transactionRepo = new TransactionRepo(entityManager);
+    //   await withTransaction(
+    //     this.entityManager,
+    //     undefined,
+    //     async (entityManager) => {
+    //       const transactionRepo = new TransactionRepo(entityManager);
 
-          // Delete all history data, and set the latest confirmed data as permanent data
-          const deleted = await transactionRepo.delete({
-            txHash: transaction.txHash,
-            updatedAtHeight: LessThan(transaction.updatedAtHeight),
-          });
-          deleteTransactionCount += deleted.affected ?? 0;
+    //       // Delete all history data, and set the latest confirmed data as permanent data
+    //       const deleted = await transactionRepo.delete({
+    //         txHash: transaction.txHash,
+    //         updatedAtHeight: LessThan(transaction.updatedAtHeight),
+    //       });
+    //       deleteTransactionCount += deleted.affected ?? 0;
 
-          await transactionRepo.update(
-            { id: transaction.id },
-            { updatedAtHeight: formatSortableInt("-1") },
-          );
-        },
-      );
-    }
+    //       await transactionRepo.update(
+    //         { id: transaction.id },
+    //         { updatedAtHeight: formatSortableInt("-1") },
+    //       );
+    //     },
+    //   );
+    // }
 
     this.logger.log(
-      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster, ${deleteTransactionCount} confirmed Transaction`,
+      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster`,
     );
   }
 
