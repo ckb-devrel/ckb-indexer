@@ -5,6 +5,7 @@ import {
   parseBtcAddress,
   parseSortableInt,
   withTransaction,
+  XudtWitness,
 } from "@app/commons";
 import { ScriptCode } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
@@ -147,6 +148,64 @@ export class UdtParser {
             },
           });
 
+          let udtOwner: string | undefined = undefined;
+          if (!existedUdtInfo && udtType.script.args.length >= 66) {
+            const ownerScriptHash = ccc.hexFrom(
+              ccc.bytesFrom(udtType.script.args).slice(0, 32),
+            );
+
+            // Compare ownerScriptHash with every parts from tx.Inputs
+            for (const input of tx.inputs) {
+              if (input.cellOutput?.lock.hash() === ownerScriptHash) {
+                udtOwner = await this.scriptToAddress(input.cellOutput.lock);
+                break;
+              }
+              if (input.cellOutput?.type?.hash() === ownerScriptHash) {
+                udtOwner = await this.scriptToAddress(input.cellOutput.type);
+                break;
+              }
+            }
+
+            // Otherwise falling back to tx.Witnesses (xUDT specific)
+            if (!udtOwner) {
+              for (const witness of tx.witnesses) {
+                const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
+                if (witnessArgs.inputType) {
+                  try {
+                    const xudtWitness = XudtWitness.decode(
+                      witnessArgs.inputType,
+                    );
+                    if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
+                      udtOwner = await this.scriptToAddress(
+                        xudtWitness.owner_script,
+                      );
+                      break;
+                    }
+                  } catch (_) {}
+                }
+                if (witnessArgs.outputType) {
+                  try {
+                    const xudtWitness = XudtWitness.decode(
+                      witnessArgs.outputType,
+                    );
+                    if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
+                      udtOwner = await this.scriptToAddress(
+                        xudtWitness.owner_script,
+                      );
+                      break;
+                    }
+                  } catch (_) {}
+                }
+              }
+            }
+
+            if (!udtOwner && diffs.some((d) => d.balance > ccc.Zero)) {
+              throw new Error(
+                `Uncompatible xUDT specification for token ${tokenHash} at tx ${txHash}`,
+              );
+            }
+          }
+
           const udtInfo = udtInfoRepo.create({
             ...(existedUdtInfo ?? {
               hash: tokenHash,
@@ -156,6 +215,7 @@ export class UdtParser {
               typeCodeHash: udtType.script.codeHash,
               typeHashType: udtType.script.hashType,
               typeArgs: udtType.script.args,
+              owner: udtOwner,
 
               firstIssuanceTxHash: txHash,
               totalSupply: formatSortable("0"),

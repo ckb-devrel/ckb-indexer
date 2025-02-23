@@ -7,6 +7,7 @@ import {
   ScriptCode,
   Spore,
   SyncStatus,
+  Transaction,
   UdtBalance,
   UdtInfo,
 } from "./schemas";
@@ -31,6 +32,7 @@ import {
           UdtBalance,
           Spore,
           Cluster,
+          Transaction,
         ],
       }),
     }),

@@ -21,6 +21,7 @@ import {
 import {
   ScriptCodeRepo,
   SyncStatusRepo,
+  TransactionRepo,
   UdtBalanceRepo,
   UdtInfoRepo,
 } from "./repos";
@@ -142,6 +143,7 @@ export class SyncService {
   private readonly blockLimitPerInterval: number | undefined;
   private readonly blockSyncStart: number | undefined;
   private readonly confirmations: number | undefined;
+  private readonly txCacheConfirmations: number | undefined;
 
   private startTip?: ccc.Num;
   private startTipTime?: number;
@@ -160,6 +162,7 @@ export class SyncService {
     private readonly clusterRepo: ClusterRepo,
     private readonly blockRepo: BlockRepo,
     private readonly scriptCodeRepo: ScriptCodeRepo,
+    private readonly transactionRepo: TransactionRepo,
   ) {
     this.isMainnet = configService.get<boolean>("sync.isMainnet");
     this.ssriServerUri = assertConfig<string>(
@@ -186,6 +189,9 @@ export class SyncService {
     );
     this.blockSyncStart = configService.get<number>("sync.blockSyncStart");
     this.confirmations = configService.get<number>("sync.confirmations");
+    this.txCacheConfirmations = configService.get<number>(
+      "sync.txCacheConfirmations",
+    );
 
     const syncInterval = configService.get<number>("sync.interval");
     if (syncInterval !== undefined) {
@@ -302,6 +308,7 @@ export class SyncService {
               const sporeRepo = new SporeRepo(entityManager);
               const udtInfoRepo = new UdtInfoRepo(entityManager);
               const udtBalanceRepo = new UdtBalanceRepo(entityManager);
+              const transactionRepo = new TransactionRepo(entityManager);
 
               await Promise.all([
                 clusterRepo.delete({
@@ -316,12 +323,30 @@ export class SyncService {
                 udtBalanceRepo.delete({
                   updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
                 }),
+                transactionRepo.delete({
+                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
+                }),
               ]);
               /* === Rollback records === */
             },
           );
           return;
         }
+
+        /* === Save block transactions === */
+        await Promise.all(
+          block.transactions.map((tx, index) => {
+            const cccTx = ccc.Transaction.from(tx);
+            return this.transactionRepo.create({
+              txHash: ccc.hexFrom(cccTx.hash()),
+              blockHash: block.header.hash,
+              txIndex: index,
+              tx: ccc.hexFrom(cccTx.toBytes()),
+              updatedAtHeight: formatSortableInt(height),
+            });
+          }),
+        );
+        /* === Save block transactions === */
 
         txsCount += block.transactions.length;
         await Promise.all(
@@ -349,6 +374,24 @@ export class SyncService {
         const txDiffs = await Promise.all(
           block.transactions.map(async (txLike) => {
             const tx = ccc.Transaction.from(txLike);
+
+            // Complete extra infos for inputs, read from db at first, otherwise fetch from rpc
+            for (const [i, input] of tx.inputs.entries()) {
+              const txHash = ccc.hexFrom(input.previousOutput.txHash);
+              const index = Number(input.previousOutput.index);
+              const prevTx = await this.transactionRepo.findOne({
+                where: { txHash },
+              });
+              if (prevTx) {
+                const prevTxObj = ccc.Transaction.fromBytes(prevTx.tx);
+                input.cellOutput = prevTxObj.outputs[index];
+                input.outputData = prevTxObj.outputsData[index];
+              } else {
+                await input.completeExtraInfos(this.client);
+              }
+              tx.inputs[i] = input;
+            }
+
             const diffs = await this.udtParser.udtInfoHandleTx(tx);
             const flows = await sporeParser.analyzeTxFlow(tx);
             return { tx, diffs, flows };
@@ -603,8 +646,30 @@ export class SyncService {
       );
     }
 
+    let deleteTransactionCount = 0;
+    if (this.txCacheConfirmations !== undefined) {
+      const txCacheConfirmedHeight =
+        pendingHeight - ccc.numFrom(this.txCacheConfirmations);
+
+      await withTransaction(
+        this.entityManager,
+        undefined,
+        async (entityManager) => {
+          const transactionRepo = new TransactionRepo(entityManager);
+
+          // Delete all history data
+          const deleted = await transactionRepo.delete({
+            updatedAtHeight: LessThan(
+              formatSortableInt(txCacheConfirmedHeight),
+            ),
+          });
+          deleteTransactionCount += deleted.affected ?? 0;
+        },
+      );
+    }
+
     this.logger.log(
-      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster`,
+      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster, ${deleteTransactionCount} confirmed transaction`,
     );
   }
 
