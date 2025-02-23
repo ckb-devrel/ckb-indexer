@@ -199,13 +199,7 @@ export class UdtParser {
               }
             }
 
-            if (!udtOwner) {
-              // Uncompatible xUDT specification
-              // this.logger.error(
-              //   `Uncompatible xUDT specification for token ${tokenHash}`,
-              // );
-
-              // Currently, throw error to stop the sync process for debugging
+            if (!udtOwner && diffs.some((d) => d.balance > ccc.Zero)) {
               throw new Error(
                 `Uncompatible xUDT specification for token ${tokenHash} at tx ${txHash}`,
               );
