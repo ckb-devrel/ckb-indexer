@@ -143,6 +143,7 @@ export class SyncService {
   private readonly blockLimitPerInterval: number | undefined;
   private readonly blockSyncStart: number | undefined;
   private readonly confirmations: number | undefined;
+  private readonly txCacheConfirmations: number | undefined;
 
   private startTip?: ccc.Num;
   private startTipTime?: number;
@@ -188,6 +189,9 @@ export class SyncService {
     );
     this.blockSyncStart = configService.get<number>("sync.blockSyncStart");
     this.confirmations = configService.get<number>("sync.confirmations");
+    this.txCacheConfirmations = configService.get<number>(
+      "sync.txCacheConfirmations",
+    );
 
     const syncInterval = configService.get<number>("sync.interval");
     if (syncInterval !== undefined) {
@@ -642,49 +646,30 @@ export class SyncService {
       );
     }
 
-    // notice: donot delete transactions, saving all of them for query operations from RPCs
-    //
-    // let deleteTransactionCount = 0;
-    // while (true) {
-    //   const transaction = await this.transactionRepo.findOne({
-    //     where: {
-    //       updatedAtHeight: And(
-    //         LessThanOrEqual(formatSortableInt(confirmedHeight)),
-    //         MoreThan(formatSortableInt("-1")),
-    //       ),
-    //     },
-    //     order: {
-    //       updatedAtHeight: "DESC",
-    //     },
-    //   });
-    //   if (!transaction) {
-    //     // No more confirmed data
-    //     break;
-    //   }
+    let deleteTransactionCount = 0;
+    if (this.txCacheConfirmations !== undefined) {
+      const txCacheConfirmedHeight =
+        pendingHeight - ccc.numFrom(this.txCacheConfirmations);
 
-    //   await withTransaction(
-    //     this.entityManager,
-    //     undefined,
-    //     async (entityManager) => {
-    //       const transactionRepo = new TransactionRepo(entityManager);
+      await withTransaction(
+        this.entityManager,
+        undefined,
+        async (entityManager) => {
+          const transactionRepo = new TransactionRepo(entityManager);
 
-    //       // Delete all history data, and set the latest confirmed data as permanent data
-    //       const deleted = await transactionRepo.delete({
-    //         txHash: transaction.txHash,
-    //         updatedAtHeight: LessThan(transaction.updatedAtHeight),
-    //       });
-    //       deleteTransactionCount += deleted.affected ?? 0;
-
-    //       await transactionRepo.update(
-    //         { id: transaction.id },
-    //         { updatedAtHeight: formatSortableInt("-1") },
-    //       );
-    //     },
-    //   );
-    // }
+          // Delete all history data
+          const deleted = await transactionRepo.delete({
+            updatedAtHeight: LessThan(
+              formatSortableInt(txCacheConfirmedHeight),
+            ),
+          });
+          deleteTransactionCount += deleted.affected ?? 0;
+        },
+      );
+    }
 
     this.logger.log(
-      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster`,
+      `Cleared ${deleteUdtInfoCount} confirmed UDT info, ${deleteUdtBalanceCount} confirmed UDT balance, ${deleteSporeCount} confirmed Spore, ${deleteClusterCount} confirmed Cluster, ${deleteTransactionCount} confirmed transaction`,
     );
   }
 

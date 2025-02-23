@@ -18,10 +18,13 @@ sync:
   threads: 8
   blockChunk: 100
   blockLimitPerInterval: 50000
-  blockSyncStart: 11922670
+  blockSyncStart: 2624950 # sUDT starts from here
 
+  # once `clearInterval` and `confirmations` set, enable automatic CLEAR process,
+  # while clearing from db, cached txs will be removed once the `txCacheConfirmations` is set
   clearInterval: 1800000
   confirmations: 100
+  txCacheComfirmations: 100000
 
   rgbppBtcCodeHash: "0xbc6c568a1a0d0a09f6844dc9d74ddb4343c32143ff25f727c59edf4fb72d6936"
   rgbppBtcHashType: "type"
