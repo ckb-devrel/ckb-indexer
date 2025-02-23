@@ -207,7 +207,7 @@ export class UdtParser {
 
               // Currently, throw error to stop the sync process for debugging
               throw new Error(
-                `Uncompatible xUDT specification for token ${tokenHash}`,
+                `Uncompatible xUDT specification for token ${tokenHash} at tx ${txHash}`,
               );
             }
           }
