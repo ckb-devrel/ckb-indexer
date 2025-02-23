@@ -16,7 +16,7 @@ sync:
 
   clearInterval: 1800000
   confirmations: 100
-  txCacheComfirmations: 100000
+  txCacheComfirmations: 1000000
 
   rgbppBtcCodeHash: "0xd07598deec7ce7b5665310386b4abd06a6d48843e953c5cc2112ad0d5a220364"
   rgbppBtcHashType: "type"
