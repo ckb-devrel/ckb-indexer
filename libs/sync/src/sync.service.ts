@@ -337,13 +337,18 @@ export class SyncService {
         await Promise.all(
           block.transactions.map((tx, index) => {
             const cccTx = ccc.Transaction.from(tx);
-            return this.transactionRepo.create({
-              txHash: ccc.hexFrom(cccTx.hash()),
-              blockHash: block.header.hash,
-              txIndex: index,
-              tx: ccc.hexFrom(cccTx.toBytes()),
-              updatedAtHeight: formatSortableInt(height),
-            });
+            return this.transactionRepo
+              .createQueryBuilder()
+              .insert()
+              .values({
+                txHash: ccc.hexFrom(cccTx.hash()),
+                blockHash: block.header.hash,
+                txIndex: index,
+                tx: ccc.hexFrom(cccTx.toBytes()),
+                updatedAtHeight: formatSortableInt(height),
+              })
+              .orIgnore()
+              .execute();
           }),
         );
         /* === Save block transactions === */
