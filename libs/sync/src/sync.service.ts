@@ -331,17 +331,11 @@ export class SyncService {
 
         /* === Save block transactions === */
         const BATCH_SIZE = 100;
-        for (
-          let batchIndex = 0;
-          batchIndex < block.transactions.length;
-          batchIndex += BATCH_SIZE
-        ) {
-          const batch = block.transactions.slice(
-            batchIndex,
-            batchIndex + BATCH_SIZE,
-          );
-          try {
-            await this.transactionRepo
+        const batches = [];
+        for (let i = 0; i < block.transactions.length; i += BATCH_SIZE) {
+          const batch = block.transactions.slice(i, i + BATCH_SIZE);
+          batches.push(
+            this.transactionRepo
               .createQueryBuilder()
               .insert()
               .into(Transaction)
@@ -357,18 +351,21 @@ export class SyncService {
               )
               .orIgnore()
               .updateEntity(false)
-              .execute();
-          } catch (error) {
-            this.logger.error(
-              `Failed to insert transactions batch ${batchIndex}-${batchIndex + batch.length} for block ${block.header.hash}`,
-              error,
-            );
-            throw error;
-          }
+              .execute()
+              .catch((error) => {
+                this.logger.error(
+                  `Failed to insert transactions batch ${i}-${i + batch.length} for block ${block.header.hash}`,
+                  error,
+                );
+                throw error;
+              }),
+          );
         }
+        await Promise.all(batches);
         /* === Save block transactions === */
 
         txsCount += block.transactions.length;
+
         await Promise.all(
           scriptCodes.map(async (scriptCode) => {
             const outPoint = ccc.hexFrom(
@@ -376,7 +373,7 @@ export class SyncService {
             );
             const existed = await this.scriptCodeRepo.findOneBy({ outPoint });
             if (!existed) {
-              await this.scriptCodeRepo.save({
+              await this.scriptCodeRepo.insert({
                 outPoint,
                 updatedAtHeight: formatSortableInt(height),
                 dataHash: scriptCode.dataHash,
