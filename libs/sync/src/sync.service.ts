@@ -335,20 +335,21 @@ export class SyncService {
 
         /* === Save block transactions === */
         await Promise.all(
-          block.transactions.map((tx, index) => {
+          block.transactions.map(async (tx, index) => {
             const cccTx = ccc.Transaction.from(tx);
-            return this.transactionRepo
-              .createQueryBuilder()
-              .insert()
-              .values({
-                txHash: ccc.hexFrom(cccTx.hash()),
-                blockHash: block.header.hash,
-                txIndex: index,
-                tx: ccc.hexFrom(cccTx.toBytes()),
-                updatedAtHeight: formatSortableInt(height),
-              })
-              .orIgnore()
-              .execute();
+            const existed = await this.transactionRepo.findOneBy({
+              txHash: ccc.hexFrom(cccTx.hash()),
+            });
+            if (existed) {
+              return;
+            }
+            return this.transactionRepo.insert({
+              txHash: ccc.hexFrom(cccTx.hash()),
+              blockHash: block.header.hash,
+              txIndex: index,
+              tx: ccc.hexFrom(cccTx.toBytes()),
+              updatedAtHeight: formatSortableInt(height),
+            });
           }),
         );
         /* === Save block transactions === */
