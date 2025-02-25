@@ -350,6 +350,7 @@ export class SyncService {
                 `Failed to save transaction ${ccc.hexFrom(cccTx.hash())}`,
                 error,
               );
+              return null;
             }
           }),
         );
