@@ -14,7 +14,6 @@ export class Transaction {
   id: number;
 
   @Column({ type: "varchar" })
-  @Index({ unique: true })
   txHash: string;
 
   @Column({ type: "varchar" })
