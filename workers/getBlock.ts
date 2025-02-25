@@ -38,7 +38,7 @@ export async function* getBlocks(
                   ) {
                     return;
                   }
-                  // await i.completeExtraInfos(client);
+                  await i.completeExtraInfos(client);
                 });
               })
               .flat(),

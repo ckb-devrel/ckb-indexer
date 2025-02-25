@@ -400,24 +400,6 @@ export class SyncService {
         const txDiffs = await Promise.all(
           block.transactions.map(async (txLike) => {
             const tx = ccc.Transaction.from(txLike);
-
-            // Complete extra infos for inputs, read from db at first, otherwise fetch from rpc
-            for (const [i, input] of tx.inputs.entries()) {
-              const txHash = ccc.hexFrom(input.previousOutput.txHash);
-              const index = Number(input.previousOutput.index);
-              const prevTx = await this.transactionRepo.findOne({
-                where: { txHash },
-              });
-              if (prevTx) {
-                const prevTxObj = ccc.Transaction.fromBytes(prevTx.tx);
-                input.cellOutput = prevTxObj.outputs[index];
-                input.outputData = prevTxObj.outputsData[index];
-              } else {
-                await input.completeExtraInfos(this.client);
-              }
-              tx.inputs[i] = input;
-            }
-
             const diffs = await this.udtParser.udtInfoHandleTx(tx);
             const flows = await sporeParser.analyzeTxFlow(tx);
             return { tx, diffs, flows };
