@@ -308,7 +308,6 @@ export class SyncService {
               const sporeRepo = new SporeRepo(entityManager);
               const udtInfoRepo = new UdtInfoRepo(entityManager);
               const udtBalanceRepo = new UdtBalanceRepo(entityManager);
-              const transactionRepo = new TransactionRepo(entityManager);
 
               await Promise.all([
                 clusterRepo.delete({
@@ -323,9 +322,6 @@ export class SyncService {
                 udtBalanceRepo.delete({
                   updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
                 }),
-                transactionRepo.delete({
-                  updatedAtHeight: MoreThanOrEqual(rolledBackHeight),
-                }),
               ]);
               /* === Rollback records === */
             },
@@ -334,7 +330,7 @@ export class SyncService {
         }
 
         /* === Save block transactions === */
-        const BATCH_SIZE = 20;
+        const BATCH_SIZE = 100;
         for (
           let batchIndex = 0;
           batchIndex < block.transactions.length;
@@ -350,12 +346,10 @@ export class SyncService {
               .insert()
               .into(Transaction)
               .values(
-                batch.map((tx, i) => {
+                batch.map((tx) => {
                   const cccTx = ccc.Transaction.from(tx);
                   return this.transactionRepo.create({
                     txHash: ccc.hexFrom(cccTx.hash()),
-                    blockHash: block.header.hash,
-                    txIndex: i + batchIndex,
                     tx: ccc.hexFrom(cccTx.toBytes()),
                     updatedAtHeight: formatSortableInt(height),
                   });
