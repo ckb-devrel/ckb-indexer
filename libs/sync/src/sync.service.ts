@@ -337,19 +337,20 @@ export class SyncService {
         await Promise.all(
           block.transactions.map(async (tx, index) => {
             const cccTx = ccc.Transaction.from(tx);
-            const existed = await this.transactionRepo.findOneBy({
-              txHash: ccc.hexFrom(cccTx.hash()),
-            });
-            if (existed) {
-              return;
+            try {
+              return this.transactionRepo.save({
+                txHash: ccc.hexFrom(cccTx.hash()),
+                blockHash: block.header.hash,
+                txIndex: index,
+                tx: ccc.hexFrom(cccTx.toBytes()),
+                updatedAtHeight: formatSortableInt(height),
+              });
+            } catch (error) {
+              this.logger.error(
+                `Failed to save transaction ${ccc.hexFrom(cccTx.hash())}`,
+                error,
+              );
             }
-            return this.transactionRepo.insert({
-              txHash: ccc.hexFrom(cccTx.hash()),
-              blockHash: block.header.hash,
-              txIndex: index,
-              tx: ccc.hexFrom(cccTx.toBytes()),
-              updatedAtHeight: formatSortableInt(height),
-            });
           }),
         );
         /* === Save block transactions === */
