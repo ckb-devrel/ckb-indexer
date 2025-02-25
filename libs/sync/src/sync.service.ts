@@ -6,7 +6,7 @@ import {
   parseSortableInt,
   withTransaction,
 } from "@app/commons";
-import { Block } from "@app/schemas";
+import { Block, Transaction } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -334,25 +334,44 @@ export class SyncService {
         }
 
         /* === Save block transactions === */
-        await Promise.allSettled(
-          block.transactions.map(async (tx, index) => {
-            const cccTx = ccc.Transaction.from(tx);
-            try {
-              return this.transactionRepo.save({
-                txHash: ccc.hexFrom(cccTx.hash()),
-                blockHash: block.header.hash,
-                txIndex: index,
-                tx: ccc.hexFrom(cccTx.toBytes()),
-                updatedAtHeight: formatSortableInt(height),
-              });
-            } catch (error) {
-              this.logger.error(
-                `Failed to save transaction ${ccc.hexFrom(cccTx.hash())}`,
-                error,
-              );
-            }
-          }),
-        );
+        const BATCH_SIZE = 20;
+        for (
+          let batchIndex = 0;
+          batchIndex < block.transactions.length;
+          batchIndex += BATCH_SIZE
+        ) {
+          const batch = block.transactions.slice(
+            batchIndex,
+            batchIndex + BATCH_SIZE,
+          );
+          try {
+            await this.transactionRepo
+              .createQueryBuilder()
+              .insert()
+              .into(Transaction)
+              .values(
+                batch.map((tx, i) => {
+                  const cccTx = ccc.Transaction.from(tx);
+                  return this.transactionRepo.create({
+                    txHash: ccc.hexFrom(cccTx.hash()),
+                    blockHash: block.header.hash,
+                    txIndex: i + batchIndex,
+                    tx: ccc.hexFrom(cccTx.toBytes()),
+                    updatedAtHeight: formatSortableInt(height),
+                  });
+                }),
+              )
+              .orIgnore()
+              .updateEntity(false)
+              .execute();
+          } catch (error) {
+            this.logger.error(
+              `Failed to insert transactions batch ${batchIndex}-${batchIndex + batch.length} for block ${block.header.hash}`,
+              error,
+            );
+            throw error;
+          }
+        }
         /* === Save block transactions === */
 
         txsCount += block.transactions.length;
