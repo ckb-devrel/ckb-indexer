@@ -334,7 +334,7 @@ export class SyncService {
         }
 
         /* === Save block transactions === */
-        await Promise.all(
+        await Promise.allSettled(
           block.transactions.map(async (tx, index) => {
             const cccTx = ccc.Transaction.from(tx);
             try {
@@ -350,7 +350,6 @@ export class SyncService {
                 `Failed to save transaction ${ccc.hexFrom(cccTx.hash())}`,
                 error,
               );
-              return null;
             }
           }),
         );
