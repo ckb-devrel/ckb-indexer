@@ -5,6 +5,8 @@ import {
   Chain,
   examineAddress,
   examineTokenId,
+  findOwnerScriptFromIssuanceTx,
+  mintableScriptMode,
   parseSortableInt,
   RpcError,
   RpcResponse,
@@ -111,12 +113,13 @@ export class UdtController {
           break;
         }
       }
-      const unmintable = lockScriptModes.some(
-        (mode) =>
-          mode === ScriptMode.RgbppBtc ||
-          mode === ScriptMode.RgbppDoge ||
-          mode === ScriptMode.SingleUseLock,
+      const ownerScript = findOwnerScriptFromIssuanceTx(
+        issueTx,
+        ccc.hexFrom(udtInfo.typeArgs),
       );
+      const mintable = ownerScript
+        ? mintableScriptMode(await this.service.scriptMode(ownerScript))
+        : false;
       const celldep = await this.service.getUdtCelldep(
         udtInfo.typeCodeHash,
         udtInfo.typeHashType,
@@ -130,7 +133,7 @@ export class UdtController {
           decimal: udtInfo.decimals ?? undefined,
           owner: udtInfo.owner ?? undefined,
           totalAmount: parseSortableInt(udtInfo.totalSupply),
-          mintable: !unmintable,
+          mintable,
           holderCount: ccc.numFrom(holderCount),
           issueChain,
           issueTxId: ccc.hexFrom(udtInfo.firstIssuanceTxHash),

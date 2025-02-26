@@ -361,3 +361,41 @@ export function examineAddress(address: string): boolean {
 export function examineTokenId(tokenId: string): boolean {
   return /^(0x)?[0-9a-fA-F]{64}$/.test(tokenId);
 }
+
+export function findOwnerScriptFromIssuanceTx(
+  tx: ccc.Transaction,
+  udtTypeArgs: ccc.Hex,
+): ccc.Script | undefined {
+  const ownerScriptHash = ccc.hexFrom(ccc.bytesFrom(udtTypeArgs).slice(0, 32));
+
+  // Compare ownerScriptHash with every parts from tx.Inputs
+  for (const input of tx.inputs) {
+    if (input.cellOutput?.lock.hash() === ownerScriptHash) {
+      return input.cellOutput.lock;
+    }
+    if (input.cellOutput?.type?.hash() === ownerScriptHash) {
+      return input.cellOutput.type;
+    }
+  }
+
+  // Otherwise falling back to tx.Witnesses (xUDT specific)
+  for (const witness of tx.witnesses) {
+    const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
+    if (witnessArgs.inputType) {
+      try {
+        const xudtWitness = XudtWitness.decode(witnessArgs.inputType);
+        if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
+          return xudtWitness.owner_script;
+        }
+      } catch (_) {}
+    }
+    if (witnessArgs.outputType) {
+      try {
+        const xudtWitness = XudtWitness.decode(witnessArgs.outputType);
+        if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
+          return xudtWitness.owner_script;
+        }
+      } catch (_) {}
+    }
+  }
+}

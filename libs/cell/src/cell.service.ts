@@ -11,7 +11,7 @@ import { ccc } from "@ckb-ccc/shell";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
-import { UdtInfoRepo } from "./repos";
+import { TransactionRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class CellService {
@@ -30,6 +30,7 @@ export class CellService {
   constructor(
     private readonly configService: ConfigService,
     private readonly udtInfoRepo: UdtInfoRepo,
+    private readonly transactionRepo: TransactionRepo,
     @Inject("BTC_REQUESTERS") private readonly btcRequesters: AxiosInstance[],
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
@@ -129,7 +130,18 @@ export class CellService {
       }
     | undefined
   > {
-    const cell = await this.client.getCell({ txHash, index });
+    let cell = await this.transactionRepo.getCellByOutpoint(
+      ccc.OutPoint.from({
+        txHash,
+        index,
+      }),
+    );
+    if (!cell) {
+      this.logger.debug(
+        `Cell (${txHash}:${index}) not found in db, fetching from ckb-rpc`,
+      );
+      cell = await this.client.getCell({ txHash, index });
+    }
     if (cell) {
       // If the cell is not an asset, skip finding the spender
       // if (cell.cellOutput.type === undefined) {

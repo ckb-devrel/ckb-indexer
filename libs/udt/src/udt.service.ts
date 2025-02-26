@@ -17,7 +17,7 @@ import { ScriptCodeRepo } from "./repos/scriptCode.repo";
 
 @Injectable()
 export class UdtService {
-  private readonly client: ccc.Client;
+  public readonly client: ccc.Client;
   private readonly rgbppBtcCodeHash: ccc.Hex;
   private readonly rgbppBtcHashType: ccc.HashType;
   private readonly udtTypes: Record<ccc.Hex, ccc.CellDepLike>;
