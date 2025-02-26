@@ -149,7 +149,14 @@ export class UdtParser {
           });
 
           let udtOwner: string | undefined = undefined;
-          if (!existedUdtInfo && udtType.script.args.length >= 66) {
+          if (
+            // If the UDT info is not existed or the owner is not set
+            (!existedUdtInfo || existedUdtInfo.owner == null) &&
+            // If there is any issuance happened
+            diffs.some((d) => d.balance > ccc.Zero) &&
+            // If the script is a standard UDT
+            udtType.script.args.length >= 66
+          ) {
             const ownerScriptHash = ccc.hexFrom(
               ccc.bytesFrom(udtType.script.args).slice(0, 32),
             );
@@ -168,7 +175,7 @@ export class UdtParser {
 
             // Otherwise falling back to tx.Witnesses (xUDT specific)
             if (!udtOwner) {
-              for (const [i, witness] of tx.witnesses.entries()) {
+              for (const witness of tx.witnesses) {
                 const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
                 if (witnessArgs.inputType) {
                   try {
@@ -181,12 +188,7 @@ export class UdtParser {
                       );
                       break;
                     }
-                  } catch (error) {
-                    this.logger.warn(
-                      `Failed to decode xUDT witness for token ${tokenHash} at tx ${txHash} (witness/inputType ${i})`,
-                      error,
-                    );
-                  }
+                  } catch (_) {}
                 }
                 if (witnessArgs.outputType) {
                   try {
@@ -199,19 +201,14 @@ export class UdtParser {
                       );
                       break;
                     }
-                  } catch (error) {
-                    this.logger.warn(
-                      `Failed to decode xUDT witness for token ${tokenHash} at tx ${txHash} (witness/outputType ${i})`,
-                      error,
-                    );
-                  }
+                  } catch (_) {}
                 }
               }
             }
 
-            if (!udtOwner && diffs.some((d) => d.balance > ccc.Zero)) {
-              throw new Error(
-                `Uncompatible xUDT specification for token ${tokenHash} at tx ${txHash}`,
+            if (!udtOwner) {
+              this.logger.error(
+                `No owner found for token ${tokenHash} at tx ${txHash}`,
               );
             }
           }
