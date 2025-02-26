@@ -168,7 +168,7 @@ export class UdtParser {
 
             // Otherwise falling back to tx.Witnesses (xUDT specific)
             if (!udtOwner) {
-              for (const witness of tx.witnesses) {
+              for (const [i, witness] of tx.witnesses.entries()) {
                 const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
                 if (witnessArgs.inputType) {
                   try {
@@ -181,7 +181,12 @@ export class UdtParser {
                       );
                       break;
                     }
-                  } catch (_) {}
+                  } catch (error) {
+                    this.logger.warn(
+                      `Failed to decode xUDT witness for token ${tokenHash} at tx ${txHash} (witness/inputType ${i})`,
+                      error,
+                    );
+                  }
                 }
                 if (witnessArgs.outputType) {
                   try {
@@ -194,7 +199,12 @@ export class UdtParser {
                       );
                       break;
                     }
-                  } catch (_) {}
+                  } catch (error) {
+                    this.logger.warn(
+                      `Failed to decode xUDT witness for token ${tokenHash} at tx ${txHash} (witness/outputType ${i})`,
+                      error,
+                    );
+                  }
                 }
               }
             }

@@ -100,31 +100,38 @@ async function* getBlocks(props: {
       }),
   );
 
-  let offset = start;
-  while (true) {
-    const workerEnd = ccc.numMin(offset + chunkSize, end);
-    if (freeWorkers.length === 0 || offset === workerEnd) {
-      const query = queries.shift();
-      if (!query) {
-        break;
+  try {
+    let offset = start;
+    while (true) {
+      const workerEnd = ccc.numMin(offset + chunkSize, end);
+      if (freeWorkers.length === 0 || offset === workerEnd) {
+        const query = queries.shift();
+        if (!query) {
+          break;
+        }
+        for (const block of await query) {
+          yield block;
+        }
+        continue;
       }
-      for (const block of await query) {
-        yield block;
-      }
-      continue;
+
+      const worker = freeWorkers.shift()!;
+      queries.push(
+        getBlocksOnWorker(worker, offset, workerEnd)
+          .then((res) => {
+            freeWorkers.push(worker);
+            return res;
+          })
+          .catch((error) => {
+            freeWorkers.push(worker);
+            throw error;
+          }),
+      );
+      offset = workerEnd;
     }
-
-    const worker = freeWorkers.shift()!;
-    queries.push(
-      getBlocksOnWorker(worker, offset, workerEnd).then((res) => {
-        freeWorkers.push(worker);
-        return res;
-      }),
-    );
-    offset = workerEnd;
+  } finally {
+    freeWorkers.forEach((worker) => worker.terminate());
   }
-
-  freeWorkers.forEach((worker) => worker.terminate());
 }
 
 @Injectable()
