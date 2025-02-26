@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 import { CellController } from "./cell.controller";
 import { CellService } from "./cell.service";
-import { UdtBalanceRepo, UdtInfoRepo } from "./repos";
+import { TransactionRepo, UdtBalanceRepo, UdtInfoRepo } from "./repos";
 
 @Module({
-  providers: [CellService, UdtInfoRepo, UdtBalanceRepo],
+  providers: [CellService, UdtInfoRepo, UdtBalanceRepo, TransactionRepo],
   exports: [CellService],
   controllers: [CellController],
 })

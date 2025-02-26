@@ -1,11 +1,11 @@
 import {
   assertConfig,
+  findOwnerScriptFromIssuanceTx,
   formatSortable,
   formatSortableInt,
   parseBtcAddress,
   parseSortableInt,
   withTransaction,
-  XudtWitness,
 } from "@app/commons";
 import { ScriptCode } from "@app/schemas";
 import { ccc } from "@ckb-ccc/shell";
@@ -157,60 +157,16 @@ export class UdtParser {
             // If the script is a standard UDT
             udtType.script.args.length >= 66
           ) {
-            const ownerScriptHash = ccc.hexFrom(
-              ccc.bytesFrom(udtType.script.args).slice(0, 32),
+            const ownerScript = findOwnerScriptFromIssuanceTx(
+              tx,
+              udtType.script.args,
             );
-
-            // Compare ownerScriptHash with every parts from tx.Inputs
-            for (const input of tx.inputs) {
-              if (input.cellOutput?.lock.hash() === ownerScriptHash) {
-                udtOwner = await this.scriptToAddress(input.cellOutput.lock);
-                break;
-              }
-              if (input.cellOutput?.type?.hash() === ownerScriptHash) {
-                udtOwner = await this.scriptToAddress(input.cellOutput.type);
-                break;
-              }
-            }
-
-            // Otherwise falling back to tx.Witnesses (xUDT specific)
-            if (!udtOwner) {
-              for (const witness of tx.witnesses) {
-                const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
-                if (witnessArgs.inputType) {
-                  try {
-                    const xudtWitness = XudtWitness.decode(
-                      witnessArgs.inputType,
-                    );
-                    if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
-                      udtOwner = await this.scriptToAddress(
-                        xudtWitness.owner_script,
-                      );
-                      break;
-                    }
-                  } catch (_) {}
-                }
-                if (witnessArgs.outputType) {
-                  try {
-                    const xudtWitness = XudtWitness.decode(
-                      witnessArgs.outputType,
-                    );
-                    if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
-                      udtOwner = await this.scriptToAddress(
-                        xudtWitness.owner_script,
-                      );
-                      break;
-                    }
-                  } catch (_) {}
-                }
-              }
-            }
-
-            if (!udtOwner) {
+            if (!ownerScript) {
               throw new Error(
                 `No owner found for token ${tokenHash} at tx ${txHash}`,
               );
             }
+            udtOwner = await this.scriptToAddress(ownerScript);
           }
 
           const udtInfo = udtInfoRepo.create({

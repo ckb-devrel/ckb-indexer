@@ -22,7 +22,7 @@ import { AssetService } from "./asset.service";
   return this.toString();
 };
 
-interface InputCell {
+interface CellWithSpender {
   cell: ccc.Cell;
   spender?: ccc.OutPointLike;
 }
@@ -129,13 +129,14 @@ export class AssetController {
   }
 
   async extractTxAssetFromTx(
-    tx: ccc.Transaction,
-    inputCells: InputCell[],
+    txHash: ccc.Hex,
+    inputCells: CellWithSpender[],
+    outputCells: CellWithSpender[],
     blockHash?: ccc.Hex,
     blockHeight?: ccc.Num,
   ): Promise<TxAssetCellData> {
     const txAssetData: TxAssetCellData = {
-      txId: tx.hash(),
+      txId: txHash,
       blockHash,
       blockHeight,
       inputs: [],
@@ -158,92 +159,98 @@ export class AssetController {
     > = {};
 
     // extract and parse inputs
-    for (const [index, input] of inputCells.entries()) {
-      if (input.cell.cellOutput.type === undefined) {
-        continue;
-      }
-      const cellAsset = await this.extractCellAssetFromCell(
-        input.cell,
-        index,
-        EventType.Burn,
-      );
-      if (cellAsset.typeCodeName === ScriptMode.Unknown) {
-        continue;
-      }
-      if (cellAsset.tokenData) {
-        const tokenId = cellAsset.tokenData.tokenId;
-        if (tokenGroups[tokenId]) {
-          tokenGroups[tokenId].input.totalBalance += cellAsset.tokenData.amount;
-          tokenGroups[tokenId].input.indices.push(txAssetData.inputs.length);
-        } else {
-          tokenGroups[tokenId] = {
-            input: {
-              totalBalance: cellAsset.tokenData.amount,
-              indices: [txAssetData.inputs.length],
-            },
-            output: {
-              totalBalance: ccc.numFrom(0),
-              mintable: cellAsset.tokenData.mintable,
-              indices: [],
-            },
-          };
+    await Promise.all(
+      inputCells.map(async (input, index) => {
+        if (input.cell.cellOutput.type === undefined) {
+          return;
         }
-      }
-      txAssetData.inputs.push(cellAsset);
-    }
+        const cellAsset = await this.extractCellAssetFromCell(
+          input.cell,
+          index,
+          EventType.Burn,
+        );
+        if (cellAsset.typeCodeName === ScriptMode.Unknown) {
+          return;
+        }
+        if (cellAsset.tokenData) {
+          const tokenId = cellAsset.tokenData.tokenId;
+          if (tokenGroups[tokenId]) {
+            tokenGroups[tokenId].input.totalBalance +=
+              cellAsset.tokenData.amount;
+            tokenGroups[tokenId].input.indices.push(txAssetData.inputs.length);
+          } else {
+            tokenGroups[tokenId] = {
+              input: {
+                totalBalance: cellAsset.tokenData.amount,
+                indices: [txAssetData.inputs.length],
+              },
+              output: {
+                totalBalance: ccc.numFrom(0),
+                mintable: cellAsset.tokenData.mintable,
+                indices: [],
+              },
+            };
+          }
+        }
+        txAssetData.inputs.push(cellAsset);
+      }),
+    );
 
     // extract and parse outputs
-    const outputCells = this.service.extractCellsFromTxOutputs(tx);
-    for (const [index, output] of outputCells.entries()) {
-      if (output.cell.cellOutput.type === undefined) {
-        continue;
-      }
-      const cellAsset = await this.extractCellAssetFromCell(
-        output.cell,
-        index,
-        EventType.Mint,
-      );
-      if (cellAsset.typeCodeName === ScriptMode.Unknown) {
-        continue;
-      }
-      if (cellAsset.nftData) {
-        const nftIndex = txAssetData.inputs.findIndex(
-          (input) =>
-            input.nftData?.tokenId === cellAsset.nftData?.tokenId &&
-            input.nftData?.clusterId === cellAsset.nftData?.clusterId,
+    await Promise.all(
+      outputCells.map(async (output, index) => {
+        if (output.cell.cellOutput.type === undefined) {
+          return;
+        }
+        const cellAsset = await this.extractCellAssetFromCell(
+          output.cell,
+          index,
+          EventType.Mint,
         );
-        if (nftIndex >= 0) {
-          txAssetData.inputs[nftIndex].eventType = EventType.Transfer;
-          cellAsset.eventType = EventType.Transfer;
+        if (cellAsset.typeCodeName === ScriptMode.Unknown) {
+          return;
         }
-      }
-      if (cellAsset.tokenData) {
-        const tokenId = cellAsset.tokenData.tokenId;
-        if (tokenGroups[tokenId]) {
-          tokenGroups[tokenId].output.totalBalance +=
-            cellAsset.tokenData.amount;
-          tokenGroups[tokenId].output.indices.push(txAssetData.outputs.length);
-        } else {
-          tokenGroups[tokenId] = {
-            input: {
-              totalBalance: ccc.numFrom(0),
-              indices: [],
-            },
-            output: {
-              totalBalance: cellAsset.tokenData.amount,
-              mintable: cellAsset.tokenData.mintable,
-              indices: [txAssetData.outputs.length],
-            },
-          };
+        if (cellAsset.nftData) {
+          const nftIndex = txAssetData.inputs.findIndex(
+            (input) =>
+              input.nftData?.tokenId === cellAsset.nftData?.tokenId &&
+              input.nftData?.clusterId === cellAsset.nftData?.clusterId,
+          );
+          if (nftIndex >= 0) {
+            txAssetData.inputs[nftIndex].eventType = EventType.Transfer;
+            cellAsset.eventType = EventType.Transfer;
+          }
         }
-      }
-      txAssetData.outputs.push(cellAsset);
-    }
+        if (cellAsset.tokenData) {
+          const tokenId = cellAsset.tokenData.tokenId;
+          if (tokenGroups[tokenId]) {
+            tokenGroups[tokenId].output.totalBalance +=
+              cellAsset.tokenData.amount;
+            tokenGroups[tokenId].output.indices.push(
+              txAssetData.outputs.length,
+            );
+          } else {
+            tokenGroups[tokenId] = {
+              input: {
+                totalBalance: ccc.numFrom(0),
+                indices: [],
+              },
+              output: {
+                totalBalance: cellAsset.tokenData.amount,
+                mintable: cellAsset.tokenData.mintable,
+                indices: [txAssetData.outputs.length],
+              },
+            };
+          }
+        }
+        txAssetData.outputs.push(cellAsset);
+      }),
+    );
 
     // re-manage token events based on the calculation of token diffs
-    for (const group of Object.values(tokenGroups)) {
+    Object.values(tokenGroups).forEach((group) => {
       if (group.input.totalBalance === 0n || group.output.totalBalance === 0n) {
-        continue;
+        return;
       }
       if (group.input.totalBalance > group.output.totalBalance) {
         group.input.indices.forEach(
@@ -254,7 +261,7 @@ export class AssetController {
           (index) =>
             (txAssetData.outputs[index].eventType = EventType.BurnAndTransfer),
         );
-        continue;
+        return;
       }
       if (group.input.totalBalance === group.output.totalBalance) {
         group.input.indices.forEach(
@@ -264,7 +271,7 @@ export class AssetController {
           (index) =>
             (txAssetData.outputs[index].eventType = EventType.Transfer),
         );
-        continue;
+        return;
       }
       if (group.input.totalBalance < group.output.totalBalance) {
         group.input.indices.forEach(
@@ -275,33 +282,35 @@ export class AssetController {
           (index) =>
             (txAssetData.outputs[index].eventType = EventType.MintAndTransfer),
         );
-        continue;
+        return;
       }
-    }
+    });
 
     // filter and append token metadata which uses unique type as identifier
     const groupKeys = Object.keys(tokenGroups);
     if (groupKeys.length > 0) {
       const firstTokenId = groupKeys[0];
-      for (const [index, output] of txAssetData.outputs.entries()) {
-        if (output.typeCodeName === ScriptMode.UniqueType) {
-          const tokenMetadata = await this.service.getUniqueInfoFromCell(
-            outputCells[index].cell,
-          );
-          if (tokenMetadata) {
-            const tokenId = ccc.hexFrom(firstTokenId);
-            txAssetData.outputs[index].tokenData = {
-              tokenId,
-              mintable: tokenGroups[tokenId].output.mintable,
-              name: tokenMetadata.name ?? undefined,
-              symbol: tokenMetadata.symbol ?? undefined,
-              decimal: tokenMetadata.decimals ?? undefined,
-              amount: tokenGroups[tokenId].output.totalBalance,
-            };
-            txAssetData.outputs[index].eventType = EventType.Issue;
+      await Promise.all(
+        txAssetData.outputs.map(async (output, index) => {
+          if (output.typeCodeName === ScriptMode.UniqueType) {
+            const tokenMetadata = await this.service.getUniqueInfoFromCell(
+              outputCells[index].cell,
+            );
+            if (tokenMetadata) {
+              const tokenId = ccc.hexFrom(firstTokenId);
+              txAssetData.outputs[index].tokenData = {
+                tokenId,
+                mintable: tokenGroups[tokenId].output.mintable,
+                name: tokenMetadata.name ?? undefined,
+                symbol: tokenMetadata.symbol ?? undefined,
+                decimal: tokenMetadata.decimals ?? undefined,
+                amount: tokenGroups[tokenId].output.totalBalance,
+              };
+              txAssetData.outputs[index].eventType = EventType.Issue;
+            }
           }
-        }
-      }
+        }),
+      );
     }
 
     return this.filterAndChangeLeapTypes(txAssetData);
@@ -348,11 +357,13 @@ export class AssetController {
         RpcError.TxNotFound,
       );
       const inputCells = await this.service.extractCellsFromTxInputs(tx);
+      const outputCells = this.service.extractCellsFromTxOutputs(tx);
       return {
         code: 0,
         data: await this.extractTxAssetFromTx(
-          tx,
+          tx.hash(),
           inputCells,
+          outputCells,
           blockHash,
           blockNumber,
         ),
@@ -384,9 +395,11 @@ export class AssetController {
       const txAssetCellDataList: TxAssetCellData[] = [];
       await asyncMap(block.transactions, async (tx) => {
         const inputCells = await this.service.extractCellsFromTxInputs(tx);
+        const outputCells = this.service.extractCellsFromTxOutputs(tx);
         const txAssetCellData = await this.extractTxAssetFromTx(
-          tx,
+          tx.hash(),
           inputCells,
+          outputCells,
           block.header.hash,
           block.header.number,
         );

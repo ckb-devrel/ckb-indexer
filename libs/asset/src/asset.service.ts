@@ -11,7 +11,7 @@ import { cccA } from "@ckb-ccc/shell/advanced";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosInstance } from "axios";
-import { ClusterRepo, SporeRepo, UdtInfoRepo } from "./repos";
+import { ClusterRepo, SporeRepo, TransactionRepo, UdtInfoRepo } from "./repos";
 
 @Injectable()
 export class AssetService {
@@ -32,6 +32,7 @@ export class AssetService {
     private readonly udtInfoRepo: UdtInfoRepo,
     private readonly sporeRepo: SporeRepo,
     private readonly clusterRepo: ClusterRepo,
+    private readonly transactionRepo: TransactionRepo,
     @Inject("BTC_REQUESTERS") private readonly btcRequesters: AxiosInstance[],
   ) {
     const isMainnet = configService.get<boolean>("sync.isMainnet");
@@ -166,15 +167,27 @@ export class AssetService {
       spender?: ccc.OutPointLike;
     }[]
   > {
-    const promises = tx.inputs.map((input) =>
-      this.client.getCell(input.previousOutput),
-    );
-    const cells = (await Promise.all(promises)).filter(
-      (cell) => cell !== undefined,
+    const outpoints = tx.inputs.map((input) => input.previousOutput);
+    const outpointToCells =
+      await this.transactionRepo.getCellsByOutpoints(outpoints);
+    let fromDb = 0;
+    let fromRpc = 0;
+    for (const outpoint of outpoints) {
+      const cell = outpointToCells.get(outpoint);
+      if (!cell) {
+        const rpcCell = await this.client.getCell(outpoint);
+        outpointToCells.set(outpoint, rpcCell);
+        fromRpc++;
+      } else {
+        fromDb++;
+      }
+    }
+    this.logger.debug(
+      `extractCellsFromTxInputs (${tx.hash()}): ${fromDb} from db, ${fromRpc} from rpc`,
     );
 
-    return cells.map((cell, index) => ({
-      cell,
+    return Array.from(outpointToCells.values()).map((cell, index) => ({
+      cell: cell!,
       spender: {
         txHash: tx.hash(),
         index,
