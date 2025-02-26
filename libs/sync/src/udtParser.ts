@@ -207,7 +207,7 @@ export class UdtParser {
             }
 
             if (!udtOwner) {
-              this.logger.error(
+              throw new Error(
                 `No owner found for token ${tokenHash} at tx ${txHash}`,
               );
             }
