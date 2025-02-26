@@ -30,7 +30,7 @@ export async function* getBlocks(
           parsing: Promise.all(
             (block?.transactions ?? [])
               .map((tx) => {
-                tx.witnesses = [];
+                // tx.witnesses = [];
                 return tx.inputs.map(async (i) => {
                   if (
                     i.previousOutput.txHash ===
