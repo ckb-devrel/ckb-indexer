@@ -13,6 +13,7 @@ import { ConfigService } from "@nestjs/config";
 import {
   And,
   EntityManager,
+  InsertResult,
   LessThan,
   LessThanOrEqual,
   MoreThan,
@@ -337,8 +338,10 @@ export class SyncService {
         }
 
         /* === Save block transactions === */
-        const BATCH_SIZE = 100;
-        const batches = [];
+        const MAX_TX_SIZE = 1024 * 1024 * 2; // 2MB
+        const BATCH_SIZE = 50;
+        let batches: Promise<InsertResult>[] = [];
+        let totalTxSize = 0;
         for (let i = 0; i < block.transactions.length; i += BATCH_SIZE) {
           const batch = block.transactions.slice(i, i + BATCH_SIZE);
           batches.push(
@@ -349,9 +352,12 @@ export class SyncService {
               .values(
                 batch.map((tx) => {
                   const cccTx = ccc.Transaction.from(tx);
+                  cccTx.witnesses = [];
+                  const molTx = Buffer.from(cccTx.toBytes());
+                  totalTxSize += molTx.length;
                   return this.transactionRepo.create({
                     txHash: ccc.hexFrom(cccTx.hash()),
-                    tx: ccc.hexFrom(cccTx.toBytes()),
+                    tx: molTx,
                     updatedAtHeight: formatSortableInt(height),
                   });
                 }),
@@ -367,6 +373,11 @@ export class SyncService {
                 throw error;
               }),
           );
+          if (totalTxSize > MAX_TX_SIZE) {
+            await Promise.all(batches);
+            batches = [];
+            totalTxSize = 0;
+          }
         }
         await Promise.all(batches);
         /* === Save block transactions === */
