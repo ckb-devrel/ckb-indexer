@@ -162,11 +162,12 @@ export class UdtParser {
               udtType.script.args,
             );
             if (!ownerScript) {
-              throw new Error(
+              this.logger.error(
                 `No owner found for token ${tokenHash} at tx ${txHash}`,
               );
+            } else {
+              udtOwner = await this.scriptToAddress(ownerScript);
             }
-            udtOwner = await this.scriptToAddress(ownerScript);
           }
 
           const udtInfo = udtInfoRepo.create({

@@ -246,9 +246,21 @@ export class AssetService {
       });
     const tokenAmount =
       cell.outputData.length >= 16 ? ccc.udtBalanceFrom(cell.outputData) : 0n;
+    let ownerScriptMode = lockMode;
+    if (tokenInfo.owner) {
+      if (tokenInfo.owner.startsWith("ck")) {
+        const ownerScript = await ccc.Address.fromString(
+          tokenInfo.owner,
+          this.client,
+        );
+        ownerScriptMode = await this.scriptMode(ownerScript.script);
+      } else {
+        ownerScriptMode = ScriptMode.RgbppBtc;
+      }
+    }
     return {
       tokenInfo,
-      mintable: mintableScriptMode(lockMode),
+      mintable: mintableScriptMode(ownerScriptMode),
       balance: tokenAmount,
     };
   }
