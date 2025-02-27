@@ -46,7 +46,7 @@ sync:
       hashType: "data1"
       cellDep:
         outPoint:
-          txHash: "0xf6a5eef65101899db9709c8de1cc28f23c1bee90d857ebe176f6647ef109e20d"
+          txHash: "0xc07844ce21b38e4b071dd0e1ee3b0e27afd8d7532491327f39b786343f558ab7"
           index: 0
         depType: "code"
     # xUDT Compatible 1
