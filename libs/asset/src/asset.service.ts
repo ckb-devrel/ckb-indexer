@@ -185,7 +185,7 @@ export class AssetService {
         fromDb++;
       }
     }
-    this.logger.debug(
+    console.log(
       `extractCellsFromTxInputs (${txHash}): ${fromDb} from db, ${fromRpc} from rpc`,
     );
 
