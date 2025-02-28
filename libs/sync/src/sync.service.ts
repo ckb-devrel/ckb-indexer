@@ -338,7 +338,6 @@ export class SyncService {
 
         /* === Save block transactions === */
         const MAX_TX_SIZE = 1024 * 1024 * 2; // 2MB
-        const BATCH_SIZE = 50;
 
         // Use a single transaction for all batches to prevent deadlocks
         await withTransaction(
@@ -346,48 +345,71 @@ export class SyncService {
           undefined,
           async (entityManager) => {
             const transactionRepo = entityManager.getRepository(Transaction);
+            const objects = [];
             let totalTxSize = 0;
+            let i = 0;
 
-            // Process batches serially instead of in parallel to avoid lock contention
-            for (let i = 0; i < block.transactions.length; i += BATCH_SIZE) {
-              const batch = block.transactions.slice(i, i + BATCH_SIZE);
-              const values = batch.map((tx) => {
-                const cccTx = ccc.Transaction.from(tx);
-                cccTx.witnesses = [];
-                const molTx = Buffer.from(cccTx.toBytes());
-                totalTxSize += molTx.length;
-                return {
-                  txHash: ccc.hexFrom(cccTx.hash()),
-                  tx: molTx,
-                  updatedAtHeight: formatSortableInt(height),
-                };
+            for (let j = 0; j < block.transactions.length; j++) {
+              const cccTx = ccc.Transaction.from(block.transactions[j]);
+              cccTx.witnesses = [];
+              const molTx = Buffer.from(cccTx.toBytes());
+              const txHash = ccc.hexFrom(cccTx.hash());
+              objects.push({
+                txHash,
+                tx: molTx,
+                updatedAtHeight: formatSortableInt(height),
               });
+              // For JavaScript GC
+              cccTx.inputs = [];
+              cccTx.outputs = [];
+              cccTx.outputsData = [];
+
+              totalTxSize += molTx.length;
+              if (
+                totalTxSize < MAX_TX_SIZE &&
+                j < block.transactions.length - 1
+              ) {
+                continue;
+              }
 
               try {
                 await transactionRepo
                   .createQueryBuilder()
                   .insert()
                   .into(Transaction)
-                  .values(values)
+                  .values(objects)
                   .orIgnore()
                   .updateEntity(false)
                   .execute();
               } catch (error) {
                 this.logger.error(
-                  `Failed to insert transactions batch ${i}-${i + batch.length} for block ${block.header.hash}`,
+                  `Failed to insert transactions batch ${i}-${j} for block ${block.header.hash}`,
                   error,
                 );
                 throw error;
               }
 
-              // If we've accumulated too much data, commit the transaction and start a new one
-              if (
-                totalTxSize > MAX_TX_SIZE &&
-                i + BATCH_SIZE < block.transactions.length
-              ) {
-                await entityManager.queryRunner?.commitTransaction();
-                await entityManager.queryRunner?.startTransaction();
-                totalTxSize = 0;
+              // If it's the last transaction, commit the transaction and break
+              if (j === block.transactions.length - 1) {
+                break;
+              }
+
+              // Commit the transaction and start a new one
+              await entityManager.queryRunner?.commitTransaction();
+              await entityManager.queryRunner?.startTransaction();
+              totalTxSize = 0;
+              i = j;
+              objects.length = 0;
+
+              // Take notice for huge block memory usage
+              if (j % 1000 === 0) {
+                const memUsage = process.memoryUsage();
+                this.logger.debug(
+                  `Memory usage: ${Math.round(
+                    memUsage.heapUsed / 1024 / 1024,
+                  )}MB, ${j} transactions processed`,
+                );
+                await new Promise((resolve) => setTimeout(resolve, 50)); // Make time for GC
               }
             }
           },
