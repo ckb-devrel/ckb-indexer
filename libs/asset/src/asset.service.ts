@@ -161,7 +161,10 @@ export class AssetService {
     }
   }
 
-  async extractCellsFromTxInputs(tx: ccc.Transaction): Promise<
+  async extractCellsFromTxInputs(
+    tx: ccc.Transaction,
+    txHash: ccc.Hex,
+  ): Promise<
     {
       cell: ccc.Cell;
       spender?: ccc.OutPointLike;
@@ -183,19 +186,22 @@ export class AssetService {
       }
     }
     this.logger.debug(
-      `extractCellsFromTxInputs (${tx.hash()}): ${fromDb} from db, ${fromRpc} from rpc`,
+      `extractCellsFromTxInputs (${txHash}): ${fromDb} from db, ${fromRpc} from rpc`,
     );
 
     return Array.from(outpointToCells.values()).map((cell, index) => ({
       cell: cell!,
       spender: {
-        txHash: tx.hash(),
+        txHash,
         index,
       },
     }));
   }
 
-  extractCellsFromTxOutputs(tx: ccc.Transaction): {
+  extractCellsFromTxOutputs(
+    tx: ccc.Transaction,
+    txHash: ccc.Hex,
+  ): {
     cell: ccc.Cell;
     spenderTx?: ccc.Hex;
   }[] {
@@ -204,7 +210,7 @@ export class AssetService {
       cells.push(
         ccc.Cell.from({
           outPoint: {
-            txHash: tx.hash(),
+            txHash,
             index: ccc.numFrom(index),
           },
           cellOutput: output,
