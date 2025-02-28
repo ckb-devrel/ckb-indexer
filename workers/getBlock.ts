@@ -94,6 +94,7 @@ parentPort?.addListener("message", ({ start, end }) =>
         isSsriUdt: boolean;
       }[] = [];
       for (const tx of block.block?.transactions ?? []) {
+        const txHash = tx.hash();
         await Promise.all(
           tx.outputs.map(async (output, i) => {
             const data = tx.outputsData[i];
@@ -104,7 +105,7 @@ parentPort?.addListener("message", ({ start, end }) =>
             }
 
             const outPoint = {
-              txHash: tx.hash(),
+              txHash,
               index: i,
             };
 
@@ -131,7 +132,7 @@ parentPort?.addListener("message", ({ start, end }) =>
 
             scriptCodes.push({
               outPoint: {
-                txHash: tx.hash(),
+                txHash,
                 index: i,
               },
               size: data.length / 2 - 1,
