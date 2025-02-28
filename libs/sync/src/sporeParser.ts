@@ -441,10 +441,11 @@ class SporeParser {
       async (entityManager) => {
         const sporeRepo = new SporeRepo(entityManager);
         const clusterRepo = new ClusterRepo(entityManager);
+        const txHash = tx.hash();
 
         for (const [sporeId, flow] of Object.entries(flows.sporeFlows)) {
           await this.handleSporeFlow(
-            tx.hash(),
+            txHash,
             ccc.hexFrom(sporeId),
             flow,
             sporeRepo,
@@ -454,7 +455,7 @@ class SporeParser {
 
         for (const [clusterId, flow] of Object.entries(flows.clusterFlows)) {
           await this.handleClusterFlow(
-            tx.hash(),
+            txHash,
             ccc.hexFrom(clusterId),
             flow,
             clusterRepo,
