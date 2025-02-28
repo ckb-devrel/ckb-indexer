@@ -113,10 +113,24 @@ export class UdtController {
           break;
         }
       }
-      const ownerScript = findOwnerScriptFromIssuanceTx(
-        issueTx,
-        ccc.hexFrom(udtInfo.typeArgs),
-      );
+      let ownerScript: ccc.Script | undefined;
+      if (udtInfo.owner) {
+        const ownerAddress = await ccc.Address.fromString(
+          udtInfo.owner,
+          this.service.client,
+        );
+        ownerScript = ownerAddress.script;
+      } else {
+        await Promise.all(
+          issueTx.inputs.map(async (input) => {
+            await input.completeExtraInfos(this.service.client);
+          }),
+        );
+        ownerScript = findOwnerScriptFromIssuanceTx(
+          issueTx,
+          ccc.hexFrom(udtInfo.typeArgs),
+        );
+      }
       const mintable = ownerScript
         ? mintableScriptMode(await this.service.scriptMode(ownerScript))
         : false;
