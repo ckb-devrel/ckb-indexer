@@ -13,7 +13,6 @@ import { ConfigService } from "@nestjs/config";
 import {
   And,
   EntityManager,
-  InsertResult,
   LessThan,
   LessThanOrEqual,
   MoreThan,
@@ -340,46 +339,59 @@ export class SyncService {
         /* === Save block transactions === */
         const MAX_TX_SIZE = 1024 * 1024 * 2; // 2MB
         const BATCH_SIZE = 50;
-        let batches: Promise<InsertResult>[] = [];
-        let totalTxSize = 0;
-        for (let i = 0; i < block.transactions.length; i += BATCH_SIZE) {
-          const batch = block.transactions.slice(i, i + BATCH_SIZE);
-          batches.push(
-            this.transactionRepo
-              .createQueryBuilder()
-              .insert()
-              .into(Transaction)
-              .values(
-                batch.map((tx) => {
-                  const cccTx = ccc.Transaction.from(tx);
-                  cccTx.witnesses = [];
-                  const molTx = Buffer.from(cccTx.toBytes());
-                  totalTxSize += molTx.length;
-                  return this.transactionRepo.create({
-                    txHash: ccc.hexFrom(cccTx.hash()),
-                    tx: molTx,
-                    updatedAtHeight: formatSortableInt(height),
-                  });
-                }),
-              )
-              .orIgnore()
-              .updateEntity(false)
-              .execute()
-              .catch((error) => {
+
+        // Use a single transaction for all batches to prevent deadlocks
+        await withTransaction(
+          this.entityManager,
+          undefined,
+          async (entityManager) => {
+            const transactionRepo = entityManager.getRepository(Transaction);
+            let totalTxSize = 0;
+
+            // Process batches serially instead of in parallel to avoid lock contention
+            for (let i = 0; i < block.transactions.length; i += BATCH_SIZE) {
+              const batch = block.transactions.slice(i, i + BATCH_SIZE);
+              const values = batch.map((tx) => {
+                const cccTx = ccc.Transaction.from(tx);
+                cccTx.witnesses = [];
+                const molTx = Buffer.from(cccTx.toBytes());
+                totalTxSize += molTx.length;
+                return {
+                  txHash: ccc.hexFrom(cccTx.hash()),
+                  tx: molTx,
+                  updatedAtHeight: formatSortableInt(height),
+                };
+              });
+
+              try {
+                await transactionRepo
+                  .createQueryBuilder()
+                  .insert()
+                  .into(Transaction)
+                  .values(values)
+                  .orIgnore()
+                  .updateEntity(false)
+                  .execute();
+              } catch (error) {
                 this.logger.error(
                   `Failed to insert transactions batch ${i}-${i + batch.length} for block ${block.header.hash}`,
                   error,
                 );
                 throw error;
-              }),
-          );
-          if (totalTxSize > MAX_TX_SIZE) {
-            await Promise.all(batches);
-            batches = [];
-            totalTxSize = 0;
-          }
-        }
-        await Promise.all(batches);
+              }
+
+              // If we've accumulated too much data, commit the transaction and start a new one
+              if (
+                totalTxSize > MAX_TX_SIZE &&
+                i + BATCH_SIZE < block.transactions.length
+              ) {
+                await entityManager.queryRunner?.commitTransaction();
+                await entityManager.queryRunner?.startTransaction();
+                totalTxSize = 0;
+              }
+            }
+          },
+        );
         /* === Save block transactions === */
 
         txsCount += block.transactions.length;
