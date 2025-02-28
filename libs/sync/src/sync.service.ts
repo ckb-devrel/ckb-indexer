@@ -394,6 +394,10 @@ export class SyncService {
               // If it's the last transaction, commit the transaction and break
               if (j === block.transactions.length - 1) {
                 break;
+              } else if (totalTxSize >= MAX_TX_SIZE) {
+                this.logger.debug(
+                  `Total tx size: ${totalTxSize}, ${j} transactions processed`,
+                );
               }
 
               // Commit the transaction and start a new one

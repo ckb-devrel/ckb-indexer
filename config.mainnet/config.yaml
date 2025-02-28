@@ -25,6 +25,7 @@ sync:
   clearInterval: 1800000
   confirmations: 100
   txCacheComfirmations: 1000000
+  txBatchMaxSize: 1048576 # 1MB
 
   rgbppBtcCodeHash: "0xbc6c568a1a0d0a09f6844dc9d74ddb4343c32143ff25f727c59edf4fb72d6936"
   rgbppBtcHashType: "type"
