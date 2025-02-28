@@ -357,14 +357,20 @@ export class AssetController {
         RpcError.TxNotFound,
       );
       console.time("extractInputs for txHash: " + txHash);
-      const inputCells = await this.service.extractCellsFromTxInputs(tx);
+      const inputCells = await this.service.extractCellsFromTxInputs(
+        tx,
+        ccc.hexFrom(txHash),
+      );
       console.timeEnd("extractInputs for txHash: " + txHash);
       console.time("extractOutputs for txHash: " + txHash);
-      const outputCells = this.service.extractCellsFromTxOutputs(tx);
+      const outputCells = this.service.extractCellsFromTxOutputs(
+        tx,
+        ccc.hexFrom(txHash),
+      );
       console.timeEnd("extractOutputs for txHash: " + txHash);
       console.time("extractAssetsData for txHash: " + txHash);
       const data = await this.extractTxAssetFromTx(
-        tx.hash(),
+        ccc.hexFrom(txHash),
         inputCells,
         outputCells,
         blockHash,
@@ -401,10 +407,14 @@ export class AssetController {
       );
       const txAssetCellDataList: TxAssetCellData[] = [];
       await asyncMap(block.transactions, async (tx) => {
-        const inputCells = await this.service.extractCellsFromTxInputs(tx);
-        const outputCells = this.service.extractCellsFromTxOutputs(tx);
+        const txHash = tx.hash();
+        const inputCells = await this.service.extractCellsFromTxInputs(
+          tx,
+          txHash,
+        );
+        const outputCells = this.service.extractCellsFromTxOutputs(tx, txHash);
         const txAssetCellData = await this.extractTxAssetFromTx(
-          tx.hash(),
+          txHash,
           inputCells,
           outputCells,
           block.header.hash,
