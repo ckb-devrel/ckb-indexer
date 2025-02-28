@@ -380,22 +380,24 @@ export function findOwnerScriptFromIssuanceTx(
 
   // Otherwise falling back to tx.Witnesses (xUDT specific)
   for (const witness of tx.witnesses) {
-    const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
-    if (witnessArgs.inputType) {
-      try {
-        const xudtWitness = XudtWitness.decode(witnessArgs.inputType);
-        if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
-          return xudtWitness.owner_script;
-        }
-      } catch (_) {}
-    }
-    if (witnessArgs.outputType) {
-      try {
-        const xudtWitness = XudtWitness.decode(witnessArgs.outputType);
-        if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
-          return xudtWitness.owner_script;
-        }
-      } catch (_) {}
-    }
+    try {
+      const witnessArgs = ccc.WitnessArgs.fromBytes(witness);
+      if (witnessArgs.inputType) {
+        try {
+          const xudtWitness = XudtWitness.decode(witnessArgs.inputType);
+          if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
+            return xudtWitness.owner_script;
+          }
+        } catch (_) {}
+      }
+      if (witnessArgs.outputType) {
+        try {
+          const xudtWitness = XudtWitness.decode(witnessArgs.outputType);
+          if (xudtWitness.owner_script?.hash() === ownerScriptHash) {
+            return xudtWitness.owner_script;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 }
