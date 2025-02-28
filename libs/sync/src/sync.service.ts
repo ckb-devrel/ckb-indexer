@@ -151,6 +151,7 @@ export class SyncService {
   private readonly blockSyncStart: number | undefined;
   private readonly confirmations: number | undefined;
   private readonly txCacheConfirmations: number | undefined;
+  private readonly txBatchMaxSize: number | undefined;
 
   private startTip?: ccc.Num;
   private startTipTime?: number;
@@ -199,6 +200,7 @@ export class SyncService {
     this.txCacheConfirmations = configService.get<number>(
       "sync.txCacheConfirmations",
     );
+    this.txBatchMaxSize = configService.get<number>("sync.txBatchMaxSize");
 
     const syncInterval = configService.get<number>("sync.interval");
     if (syncInterval !== undefined) {
@@ -337,7 +339,7 @@ export class SyncService {
         }
 
         /* === Save block transactions === */
-        const MAX_TX_SIZE = 1024 * 1024 * 2; // 2MB
+        const MAX_TX_SIZE = this.txBatchMaxSize ?? 1024 * 1024 * 2; // 2MB
 
         // Use a single transaction for all batches to prevent deadlocks
         await withTransaction(
@@ -401,15 +403,10 @@ export class SyncService {
               i = j;
               objects.length = 0;
 
-              // Take notice for huge block memory usage
-              if (j % 1000 === 0) {
-                const memUsage = process.memoryUsage();
-                this.logger.debug(
-                  `Memory usage: ${Math.round(
-                    memUsage.heapUsed / 1024 / 1024,
-                  )}MB, ${j} transactions processed`,
-                );
-                await new Promise((resolve) => setTimeout(resolve, 50)); // Make time for GC
+              if (global.gc) {
+                global.gc();
+              } else {
+                await new Promise((resolve) => setTimeout(resolve, 100));
               }
             }
           },
