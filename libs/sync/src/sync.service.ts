@@ -361,10 +361,6 @@ export class SyncService {
                 tx: molTx,
                 updatedAtHeight: formatSortableInt(height),
               });
-              // For JavaScript GC
-              cccTx.inputs = [];
-              cccTx.outputs = [];
-              cccTx.outputsData = [];
 
               totalTxSize += molTx.length;
               if (
@@ -406,12 +402,6 @@ export class SyncService {
               totalTxSize = 0;
               i = j;
               objects.length = 0;
-
-              if (global.gc) {
-                global.gc();
-              } else {
-                await new Promise((resolve) => setTimeout(resolve, 100));
-              }
             }
           },
         );
