@@ -356,30 +356,23 @@ export class AssetController {
         await this.service.getTransactionWithBlockByTxHash(txHash),
         RpcError.TxNotFound,
       );
-      console.time("extractInputs for txHash: " + txHash);
       const inputCells = await this.service.extractCellsFromTxInputs(
         tx,
         ccc.hexFrom(txHash),
       );
-      console.timeEnd("extractInputs for txHash: " + txHash);
-      console.time("extractOutputs for txHash: " + txHash);
       const outputCells = this.service.extractCellsFromTxOutputs(
         tx,
         ccc.hexFrom(txHash),
       );
-      console.timeEnd("extractOutputs for txHash: " + txHash);
-      console.time("extractAssetsData for txHash: " + txHash);
-      const data = await this.extractTxAssetFromTx(
-        ccc.hexFrom(txHash),
-        inputCells,
-        outputCells,
-        blockHash,
-        blockNumber,
-      );
-      console.timeEnd("extractAssetsData for txHash: " + txHash);
       return {
         code: 0,
-        data,
+        data: await this.extractTxAssetFromTx(
+          ccc.hexFrom(txHash),
+          inputCells,
+          outputCells,
+          blockHash,
+          blockNumber,
+        ),
       };
     } catch (e) {
       if (e instanceof ApiError) {
