@@ -179,23 +179,27 @@ export class AssetService {
       const cell = outpointToCells.get(outpoint);
       if (!cell) {
         const rpcCell = await this.client.getCell(outpoint);
-        outpointToCells.set(outpoint, rpcCell);
-        fromRpc++;
+        if (rpcCell) {
+          outpointToCells.set(outpoint, rpcCell);
+          fromRpc++;
+        }
       } else {
         fromDb++;
       }
     }
-    console.log(
+    this.logger.debug(
       `extractCellsFromTxInputs (${txHash}): ${fromDb} from db, ${fromRpc} from rpc`,
     );
 
-    return Array.from(outpointToCells.values()).map((cell, index) => ({
-      cell: cell!,
-      spender: {
-        txHash,
-        index,
-      },
-    }));
+    return Array.from(outpointToCells.values())
+      .filter((cell) => cell !== undefined)
+      .map((cell, index) => ({
+        cell,
+        spender: {
+          txHash,
+          index,
+        },
+      }));
   }
 
   extractCellsFromTxOutputs(
