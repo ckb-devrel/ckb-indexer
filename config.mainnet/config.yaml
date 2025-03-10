@@ -14,25 +14,38 @@ mysql:
   database: appdb
 
 sync:
+  # Block synchronization interval (milliseconds)
   interval: 10000
+  # Number of synchronization threads
   threads: 8
+  # Number of blocks to process in each chunk
+  # note: (higher value could lead to higher memory usage, if meet JavaScript GC issues, please try to reduce this value)
   blockChunk: 100
+  # Maximum number of blocks to process per interval
   blockLimitPerInterval: 50000
+  # Starting block height for synchronization (only affects in initial stage)
   blockSyncStart: 2624950 # sUDT starts from here
 
   # once `clearInterval` and `confirmations` set, enable automatic CLEAR process,
   # while clearing from db, cached txs will be removed once the `txCacheConfirmations` is set
   clearInterval: 1800000
+  # Number of block confirmations required for finality
+  # note: (delete this key if you want to disable the db pruning feature)
   confirmations: 100
-  txCacheComfirmations: 1000000
+  # Number of block confirmations before removing transactions from cache
+  txCacheComfirmations: 5000000
+  # Maximum batch size for transaction processing in one block (bytes)
   txBatchMaxSize: 1048576 # 1MB
 
+  # Code hash and hash type for RGB++ script
   rgbppBtcCodeHash: "0xbc6c568a1a0d0a09f6844dc9d74ddb4343c32143ff25f727c59edf4fb72d6936"
   rgbppBtcHashType: "type"
 
+  # Code hash and hash type for RGB++ BTC timelock script
   rgbppBtcTimelockCodeHash: "0x70d64497a075bd651e98ac030455ea200637ee325a12ad08aff03f1a117e5a62"
   rgbppBtcTimelockHashType: "type"
 
+  # Supported UDT (User-Defined Token) configuration
   udtTypes:
     # sUDT
     - codeHash: "0x5e7a36a77e68eecc013dfa2fe6a23f3b6c344b04005808694ae6dd45eea4cfd5"
@@ -83,13 +96,21 @@ sync:
           index: 0
         depType: "code"
 
+  # Indicate mainnet configuration
   isMainnet: true
+  # Maximum number of concurrent requests (higher value could lead to higher memory usage)
   maxConcurrent: 1024
+  # CKB RPC timeout (milliseconds)
   ckbRpcTimeout: 60000
+  # CKB node WebSocket RPC address (WebSocket has higher performance)
   ckbRpcUri: wss://mainnet.ckb.dev/ws
+  # Spore/DOB decoder server address from docker-compose.yaml
   decoderServerUri: http://decoder:8090
+  # SSRI server address from docker-compose.yaml
   ssriServerUri: http://ssri:9090
 
+  # Bitcoin RPC configuration list
+  # note. (username and password are optional, if the Bitcoin rpc requires authentication)
   btcRpcs:
     - uri: https://rpc.ankr.com/btc
       # username: username
