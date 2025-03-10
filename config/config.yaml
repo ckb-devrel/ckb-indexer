@@ -8,25 +8,39 @@ mysql:
   database: appdb
 
 sync:
+  # Block synchronization interval (milliseconds)
   interval: 10000
+  # Number of synchronization threads
   threads: 8
+  # Number of blocks to process in each chunk
+  # note: (higher value could lead to higher memory usage, if meet JavaScript GC issues, please try to reduce this value)
   blockChunk: 100
+  # Maximum number of blocks to process per interval
   blockLimitPerInterval: 50000
-  blockSyncStart: 3804
+  # Starting block height for synchronization (only affects in initial stage)
+  blockSyncStart: 3804 # where the sUDT contract was deployed on testnet
 
+  # Time interval for clearing old data (milliseconds)
   clearInterval: 1800000
+  # Number of block confirmations required for finality
+  # note: (delete this key if you want to disable the db pruning feature)
   confirmations: 100
-  txCacheComfirmations: 1000000
+  # Number of block confirmations before removing transactions from cache
+  txCacheComfirmations: 5000000
+  # Maximum batch size for transaction processing in one block (bytes)
   txBatchMaxSize: 1048576 # 1MB
 
+  # Code hash and hash type for RGB++ script
   rgbppBtcCodeHash: "0xd07598deec7ce7b5665310386b4abd06a6d48843e953c5cc2112ad0d5a220364"
   rgbppBtcHashType: "type"
 
+  # Code hash and hash type for RGB++ BTC timelock script
   rgbppBtcTimelockCodeHash: "0x80a09eca26d77cea1f5a69471c59481be7404febf40ee90f886c36a948385b55"
   rgbppBtcTimelockHashType: "type"
 
+  # Supported UDT (User-Defined Token) configuration
   udtTypes:
-    # sUDT
+    # sUDT standard
     - codeHash: "0x48dbf59b4c7ee1547238021b4869bceedf4eea6b43772e5d66ef8865b6ae7212"
       hashType: "data"
       cellDep:
@@ -34,7 +48,7 @@ sync:
           txHash: "0xc1b2ae129fad7465aaa9acc9785f842ba3e6e8b8051d899defa89f5508a77958"
           index: 0
         depType: "code"
-    # sUDT
+    # sUDT standard (alternative version)
     - codeHash: "0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4"
       hashType: "type"
       cellDep:
@@ -42,7 +56,7 @@ sync:
           txHash: "0xe12877ebd2c3c364dc46c5c992bcfaf4fee33fa13eebdf82c591fc9825aab769"
           index: 0
         depType: "code"
-    # xUDT
+    # xUDT standard
     - codeHash: "0x50bd8d6680b8b9cf98b73f3c08faf8b2a21914311954118ad6609be6e78a1b95"
       hashType: "data1"
       cellDep:
@@ -50,7 +64,7 @@ sync:
           txHash: "0x2267aca4b355d17683f4f74deb37b619c2038805dfd272afbdf63cb50175aa7b"
           index: 0
         depType: "code"
-    # xUDT Compatible 1
+    # xUDT compatible version 1
     - codeHash: "0x98701eaf939113606a8a70013fd2e8f27b8f1e234acdc329f3d71f9e9d3d3233"
       hashType: "type"
       cellDep:
@@ -58,7 +72,7 @@ sync:
           txHash: "0x877c4c3c6f7159f29ea711f0cd21a54f93dcf950642c6a3a5abc9c070051372e"
           index: 0
         depType: "code"
-    # xUDT Compatible 2
+    # xUDT compatible version 2
     - codeHash: "0x1142755a044bf2ee358cba9f2da187ce928c91cd4dc8692ded0337efa677d21a"
       hashType: "type"
       cellDep:
@@ -66,7 +80,7 @@ sync:
           txHash: "0xed7d65b9ad3d99657e37c4285d585fea8a5fcaf58165d54dacf90243f911548b"
           index: 0
         depType: "code"
-    # xUDT Compatible 3
+    # xUDT compatible version 3
     - codeHash: "0xcc9dc33ef234e14bc788c43a4848556a5fb16401a04662fc55db9bb201987037"
       hashType: "type"
       cellDep:
@@ -74,7 +88,7 @@ sync:
           txHash: "0xaec423c2af7fe844b476333190096b10fc5726e6d9ac58a9b71f71ffac204fee"
           index: 0
         depType: "code"
-    # xUDT(final_rls)
+    # xUDT final release version
     - codeHash: "0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb"
       hashType: "type"
       cellDep:
@@ -83,13 +97,21 @@ sync:
           index: 0
         depType: "code"
 
+  # Indicate testnet configuration
   isMainnet: false
+  # Maximum number of concurrent requests (higher value could lead to higher memory usage)
   maxConcurrent: 1024
+  # CKB RPC timeout (milliseconds)
   ckbRpcTimeout: 60000
+  # CKB node WebSocket RPC address (WebSocket has higher performance)
   ckbRpcUri: wss://testnet.ckb.dev/ws
+  # Spore/DOB decoder server address from docker-compose.yaml
   decoderServerUri: http://decoder:8090
+  # SSRI server address from docker-compose.yaml
   ssriServerUri: http://ssri:9090
 
+  # Bitcoin RPC configuration list
+  # note. (username and password are optional, if the Bitcoin rpc requires authentication)
   btcRpcs:
     - uri: https://rpc.ankr.com/btc_signet
       # username: username

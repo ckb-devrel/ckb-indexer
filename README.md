@@ -1,73 +1,97 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# CKB Asset-specified Indexer
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A comprehensive solution for developers to interact with CKB network assets (UDT tokens and DOB NFTs) through simplified interfaces. This project serves as both an asset explorer with reorg feature supported and a global state tracker for sUDT/xUDT and Spore protocols.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This project provides a streamlined API for accessing and managing assets on the CKB network, with built-in support for the rgb++ protocol. It's designed with modularity in mind, allowing individual components to run as independent microservices to meet varying throughput requirements.
 
-## Description
+## Architecture
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The application is built on Next.js and follows a modular microservice architecture:
 
-## Installation
+### Core Modules
 
-```bash
-$ pnpm install
-```
+1. **Asset Service** (`libs/asset`)
 
-## Running the app
+   - Handles interaction with CKB cells containing UDT and DOB assets
+   - Provides methods for token identification, balance calculation, and ownership verification
+   - Supports various token standards including sUDT and xUDT with RGB++ assets supported
 
-```bash
-# development
-$ pnpm run start
+2. **Sync Service** (`libs/sync`)
 
-# watch mode
-$ pnpm run start:dev
+   - Manages blockchain synchronization with configurable parameters
+   - Processes blocks in chunks with multi-threading support
+   - Handles transaction caching and database management
+   - Implements automatic clearing processes with configurable confirmations
 
-# production mode
-$ pnpm run start:prod
-```
+3. **Block Service** (`libs/block`)
 
-## Test
+   - Provides access to blockchain data at the block level
+   - Supports efficient querying of historical block data
 
-```bash
-# unit tests
-$ pnpm run test
+4. **Cell Service** (`libs/cell`)
 
-# e2e tests
-$ pnpm run test:e2e
+   - Tracks cell creation, consumption, and state changes
+   - Provides efficient lookup for cells by various criteria
+   - Supports complex cell queries with filtering capabilities
 
-# test coverage
-$ pnpm run test:cov
-```
+5. **Spore Service** (`libs/spore`)
 
-## Support
+   - Provides metadata extraction and content resolution
+   - Supports Spore-specific queries and filtering
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+6. **UDT Service** (`libs/udt`)
 
-## Stay in touch
+   - Dedicated to User-Defined Token management
+   - Tracks token issuance, mints, transfers, burns and balances
+   - Supports multiple UDT standards (sUDT, xUDT)
+   - Provides a overview of token and its holders information
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Supporting Services
 
-## License
+- **DOB Decoder Server**: A standalone server for parsing on-chain spores under DOB protocol
+- **SSRI Server**: A standalone server for extracting SSRI information
 
-Nest is [MIT licensed](LICENSE).
+## Setup and Deployment
+
+### Prerequisites
+
+- Docker and Docker Compose
+- At least 8GB RAM for optimal performance
+- Sufficient disk space for MySql data
+
+### Quick Start
+
+1. Clone the repository:
+
+   ```bash
+   $ git clone https://github.com/ckb-devrel/ckb-indexer.git
+   $ cd ckb-indexer
+   ```
+
+2. Start the services using Docker Compose:
+
+   ```bash
+   $ docker compose build
+   $ docker compose up -d
+   $ docker compose logs -f
+   ```
+
+3. Access the Swagger API documentation:
+   ```
+   http://localhost:8080/docs
+   ```
+
+### Configuration
+
+The application uses YAML configuration files located in the `config` directory:
+
+- For testnet: `config/config.yaml`
+- For mainnet: `config.mainnet/config.yaml`
+
+note: `config.dob-decoder.toml` and `config.ssri-server.toml` files keeping the same is fine.
+
+## Notes
+
+1. After the first startup, the indexer needs to synchronize from the initialization block specified in the configuration (key `blockSyncStart`). According to your runtime environment, this process may take 3-4 days to complete.
+
+2. Depending on your machine's specifications, JavaScript GC issues might be encountered during synchronization. If this happens, please adjust the configuration parameters that could lead to high memory usage according to the comments in the configuration file (such as `blockChunk` and `maxConcurrent`).
