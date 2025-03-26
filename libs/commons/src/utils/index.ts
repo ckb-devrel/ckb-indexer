@@ -250,6 +250,13 @@ export async function parseBtcAddress(params: {
     return ckbAddress;
   }
   const { outIndex, txId } = decoded;
+  // Check if txId is a standard 32-byte hex string (with 0x prefix)
+  if (txId.length !== 66) {
+    logger?.warn(
+      `Invalid BTC txId format: ${txId}. Expected 0x-prefixed 32-byte hex string.`,
+    );
+    return ckbAddress;
+  }
 
   let fallbackToCkb = false;
   for (const requester of requesters) {
