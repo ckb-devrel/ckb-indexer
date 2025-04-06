@@ -252,6 +252,14 @@ class SporeParser {
     sporeRepo: SporeRepo,
     clusterRepo: ClusterRepo,
   ) {
+    // CUATION: some of DID spores have totally empty sporeId, which will be seen as identical
+    if (sporeId.length !== 66) {
+      this.context.logger.warn(
+        `Spore ID ${sporeId} is not standardized in tx ${txHash}, skipping`,
+      );
+      return;
+    }
+
     const { asset, mint, transfer, burn } = flow;
     if (!flow.asset.spore) {
       return;
@@ -263,10 +271,6 @@ class SporeParser {
 
     if (mint) {
       if (prevSpore) {
-        // CUATION: some of DID spores have totally empty sporeId, which will be seen as identical
-        if (sporeId === "0x") {
-          return;
-        }
         throw new Error(
           `Spore already exists when minting ${sporeId}, at tx ${txHash}`,
         );
