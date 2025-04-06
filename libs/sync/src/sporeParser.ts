@@ -263,6 +263,10 @@ class SporeParser {
 
     if (mint) {
       if (prevSpore) {
+        // CUATION: some of DID spores have totally empty sporeId, which will be seen as identical
+        if (sporeId === "0x") {
+          return;
+        }
         throw new Error(
           `Spore already exists when minting ${sporeId}, at tx ${txHash}`,
         );
