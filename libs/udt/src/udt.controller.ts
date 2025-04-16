@@ -114,7 +114,7 @@ export class UdtController {
         }
       }
       let ownerScript: ccc.Script | undefined;
-      if (udtInfo.owner) {
+      if (udtInfo.owner && udtInfo.owner.startsWith("ck")) {
         const ownerAddress = await ccc.Address.fromString(
           udtInfo.owner,
           this.service.client,
